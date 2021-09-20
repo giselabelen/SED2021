@@ -14418,22 +14418,29 @@ div.jp-OutputPrompt {
 <p>Por lo tanto, un primer bosquejo de la estructura de nuestro modelo comprende los siguientes componentes:</p>
 
 </div>
+</div></section><section>
+<div class="jp-Cell-inputWrapper"><div class="jp-InputPrompt jp-InputArea-prompt">
+</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput " data-mime-type="text/markdown">
+<p><em>Esquema general del modelo</em></p>
+<p><img src="./img/SED2021-TP1-General.png" alt="esquema general"></p>
+
+</div>
 </div></section></section><section><section>
 <div class="jp-Cell-inputWrapper"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput " data-mime-type="text/markdown">
 <h3 id="Generador-de-llamadas">Generador de llamadas<a class="anchor-link" href="#Generador-de-llamadas">&#182;</a></h3><ul>
 <li>Representa las llamadas que recibe el centro de atención.</li>
-<li>No tiene input.</li>
+<li>Su único input corresponde a un evento que indica cuándo dejar de generar llamados.</li>
 <li>Periódicamente genera llamadas según alguna distribución.</li>
 <li>Cada llamada generada corresponde a un cliente o a una persona que aún no es cliente.</li>
-<li>Cada llamada generada mantiene la cuenta del tiempo que demora en ser atendida y resuelta, empezando con tiempo 0.</li>
 </ul>
 
 </div>
 </div></section><section>
 <div class="jp-Cell-inputWrapper"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput " data-mime-type="text/markdown">
-<p><em>PONER DIBUJITO</em></p>
+<p><em>Esquema del generador de llamadas</em></p>
+<p><img src="./img/SED2021-TP1-Generador.png" alt="esquema general"></p>
 
 </div>
 </div></section></section><section><section>
@@ -14451,36 +14458,44 @@ div.jp-OutputPrompt {
 </div></section><section>
 <div class="jp-Cell-inputWrapper"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput " data-mime-type="text/markdown">
-<p><em>PONER DIBUJITO</em></p>
+<p><em>Esquema de la mesa de entrada</em></p>
+<p><img src="./img/SED2021-TP1-mesa_de_entrada.png" alt="esquema general"></p>
 
 </div>
 </div></section></section><section><section>
 <div class="jp-Cell-inputWrapper"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput " data-mime-type="text/markdown">
 <h3 id="%C3%81reas-de-atenci%C3%B3n-espec%C3%ADfica">&#193;reas de atenci&#243;n espec&#237;fica<a class="anchor-link" href="#%C3%81reas-de-atenci%C3%B3n-espec%C3%ADfica">&#182;</a></h3><ul>
-<li>Cada una de las áreas recibe como input las llamadas que va redirigiendo la mesa de entrada.</li>
+<li>Cada una de las áreas recibe como input las llamadas que llegan desde la mesa de entrada.</li>
 <li>Estas llamadas ingresan a una cola de espera.</li>
 <li>Un distrbuidor va desencolando las llamadas y asignándolas a los agentes que se encuentren disponibles.</li>
-<li>Cada agente atiende una llamada y consume cierto tiempo para resolver la solicitud. Al finalizar, envía al medidor de métricas de calidad el tiempo que demoró en resolver la solicitud, y el tiempo total de la llamada desde que ingresó al centro de atención telefónica.</li>
+<li>Cada agente atiende una llamada y resuelve la solicitud. </li>
+<li>Cada área comunica, a través de sus outputs, el momento en que cada llamada es atendida por un agente y el momento en que cada agente resuelve la solicitud de una llamada y la misma finaliza.</li>
 </ul>
 
 </div>
 </div></section><section>
 <div class="jp-Cell-inputWrapper"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput " data-mime-type="text/markdown">
-<p><em>PONER DIBUJITO</em></p>
+<p><em>Esquema de las áreas de atención específica</em></p>
+<p><img src="./img/SED2021-TP1-areas_especificas.png" alt="esquema general"></p>
 
 </div>
 </div></section></section><section><section>
 <div class="jp-Cell-inputWrapper"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput " data-mime-type="text/markdown">
 <h3 id="Medidor-de-m%C3%A9tricas">Medidor de m&#233;tricas<a class="anchor-link" href="#Medidor-de-m%C3%A9tricas">&#182;</a></h3><ul>
-<li>Comprende diversos subcomponentes que evaluarán distintas métricas de calidad cada uno, a partir de los datos recibidos por parte de las áreas de atención específica. </li>
+<li>Comprende diversos subcomponentes que evaluarán distintas métricas de calidad cada uno, a partir de los datos recibidos a lo largo del recorrido de la llamada por el centro de atención telefónica, a saber:<ul>
+<li>Momento en que arriba una llamada al servicio</li>
+<li>Momento en que la llamada es atendida por un agente</li>
+<li>Momento en que la solicitud es resuelta por un agente</li>
+</ul>
+</li>
 <li>Nuestro primer bosquejo comprende las siguientes métricas:<ul>
-<li>Tiempo promedio que una llamada está aguardando ser atendida (es decir, tiempo encolada)</li>
-<li>Tiempo máximo que una llamada estuvo aguardando ser atendida (es decir, tiempo encolada)</li>
-<li>Tiempo promedio que una llamada consume dentro del centro de atención (es decir, desde que ingresa a mesa de entrada hasta que su solicitud se resuelve)</li>
-<li>Tiempo máximo que una llamada consumió dentro del centro de atención (es decir, desde que ingresa a mesa de entrada hasta que su solicitud se resuelve)</li>
+<li>Tiempo promedio que una llamada está aguardando ser atendida (es decir, desde que llega hasta que es atendida por un agente)</li>
+<li>Tiempo máximo que una llamada estuvo aguardando ser atendida (es decir, desde que llega hasta que es atendida por un agente)</li>
+<li>Tiempo promedio que una llamada consume dentro del centro de atención (es decir, desde que llega hasta que su solicitud se resuelve)</li>
+<li>Tiempo máximo que una llamada consumió dentro del centro de atención (es decir, desde que llega hasta que su solicitud se resuelve)</li>
 </ul>
 </li>
 </ul>
@@ -14489,23 +14504,10 @@ div.jp-OutputPrompt {
 </div></section><section>
 <div class="jp-Cell-inputWrapper"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput " data-mime-type="text/markdown">
-<p><em>PONER DIBUJITO</em></p>
+<p><em>Esquema de los medidores de métricas</em></p>
+<p><img src="./img/SED2021-TP1-Medidor.png" alt="esquema general"></p>
 
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs  ">
-<div class="jp-Cell-inputWrapper">
-<div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In&nbsp;[&nbsp;]:</div>
-<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
-     <div class="CodeMirror cm-s-jupyter">
-<div class=" highlight hl-ipython3"><pre><span></span> 
-</pre></div>
-
-     </div>
-</div>
-</div>
-</div>
-
 </div></section></section>
 </div>
 </div>
