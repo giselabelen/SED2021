@@ -33,29 +33,30 @@ using namespace std;
 * Function Name: [#MODEL_NAME#]
 * Description: constructor
 ********************************************************************/
-DistribuidorLlamadas::DistribuidorLlamadas( const string &name ) : 
+DistribuidorLlamadas::DistribuidorLlamadas( const string &name ) :
 	Atomic( name )
-	// TODO: add ports here if needed (Remember to add them to the .h file also). Each in a new line.
-	// Ej:
-	// , out(addOutputPort( "out" ))
-	// , in(addInputPort( "in" ))
+	, entrante(addInputPort("entrante"))
+	, pedirLlamada(addOutputPort("pedirLlamada"))
+	, clientes(addOutputPort("clientes"))
+  , noClientes(addOutputPort("noClientes"))
 {
-	// TODO: add initialization code here. (reading parameters, initializing private vars, etc)
-	// Code templates for reading parameters:
-	// read string parameter:
-	// 		stringVar = ParallelMainSimulator::Instance().getParameter( description(), "paramName" );
-	// read int parameter:
-	// 		intVar = str2Int( ParallelMainSimulator::Instance().getParameter( description(), "initial" ) );
-	// read time parameter:
-	//		timeVar = string time( ParallelMainSimulator::Instance().getParameter( description(), "preparation" ) ) ;
-	// read distribution parameters:
-	//		dist = Distribution::create( ParallelMainSimulator::Instance().getParameter( description(), "distribution" ) );
-	//		MASSERT( dist ) ;
-	//		for ( register int i = 0; i < dist->varCount(); i++ )
-	//		{
-	//			string parameter( ParallelMainSimulator::Instance().getParameter( description(), dist->getVar( i ) ) ) ;
-	//			dist->setVar( i, str2Value( parameter ) ) ;
-	//		}
+  try {
+		dist = Distribution::create( ParallelMainSimulator::Instance().getParameter( description(), "distribution" ) );
+		MASSERT( dist ) ;
+		for ( register int i = 0; i < dist->varCount(); i++ )
+    {
+      string parameter( ParallelMainSimulator::Instance().getParameter( description(), dist->getVar( i ) ) ) ;
+      dist->setVar( i, str2Value( parameter ) ) ;
+    }
+	}
+  catch( InvalidDistribution &e )	{
+		e.addText( "The model " + description() + " has distribution problems!" ) ;
+		e.print(cerr);
+		MTHROW( e ) ;
+	}
+  catch( MException &e ) {
+		MTHROW( e ) ;
+	}
 }
 
 /*******************************************************************
@@ -63,14 +64,9 @@ DistribuidorLlamadas::DistribuidorLlamadas( const string &name ) :
 ********************************************************************/
 Model &DistribuidorLlamadas::initFunction()
 {
-	// [(!) Initialize common variables]
-	this->elapsed  = VTime::Zero;
- 	this->timeLeft = VTime::Inf;
- 	// this->sigma = VTime::Inf; // stays in active state until an external event occurs;
  	this->sigma    = VTime::Zero; // force an internal transition in t=0;
-
- 	// TODO: add init code here. (setting first state, etc)
- 	
+  estado = Estados::PIDIENDO;
+  llamada = Tuple<Real>({-1.0, -1.0});
  	// set next transition
  	holdIn( AtomicState::active, this->sigma  ) ;
 	return *this ;
@@ -85,20 +81,13 @@ Model &DistribuidorLlamadas::externalFunction( const ExternalMessage &msg )
 #if VERBOSE
 	PRINT_TIMES("dext");
 #endif
-	//[(!) update common variables]	
-	this->sigma    = nextChange();	
-	this->elapsed  = msg.time()-lastChange();	
- 	this->timeLeft = this->sigma - this->elapsed; 
-	
-	//TODO: implement the external function here.
- 	// Remember you can use the msg object (mgs.port(), msg.value()) and you should set the next TA (you might use the holdIn method).
- 	// EJ:
- 	// if( msg.port() == in )
-	//{
-	//	// Do something
-	//	holdIn( AtomicState::active, this->timeLeft );
-	// }
-	
+  if (msg.port() == entrante && estado == Estados::ESPERANDO) {
+    estado = Estados::ENVIANDO;
+    llamada = *dynamic_pointer_cast<Tuple<Real>>(msg.value());
+    this->sigma = VTime(static_cast< float >(fabs(distribution().get())));
+    holdIn( AtomicState::active, this->sigma );
+  }
+
 	return *this ;
 }
 
@@ -112,12 +101,22 @@ Model &DistribuidorLlamadas::internalFunction( const InternalMessage &msg )
 #if VERBOSE
 	PRINT_TIMES("dint");
 #endif
-	//TODO: implement the internal function here
 
-	this->sigma = VTime::Inf; // stays in passive state until an external event occurs;
-	holdIn( AtomicState::passive, this->sigma );
+  switch (estado) {
+  case Estados::PIDIENDO:
+    estado = Estados::ESPERANDO;
+    passivate();
+    break;
+  case Estados::ENVIANDO:
+    estado = Estados::PIDIENDO;
+    this->sigma = VTime::Zero;
+    holdIn( AtomicState::active, this->sigma );
+    break;
+  default:
+    MASSERT(false);
+    break;
+  }
 	return *this;
-
 }
 
 /*******************************************************************
@@ -130,15 +129,30 @@ Model &DistribuidorLlamadas::outputFunction( const CollectMessage &msg )
 	//TODO: implement the output function here
 	// remember you can use sendOutput(time, outputPort, value) function.
 	// sendOutput( msg.time(), out, 1) ;
-	// value could be a tuple with different number of elements: 
+	// value could be a tuple with different number of elements:
 	// Tuple<Real> out_value{Real(value), 0, 1};
 	// sendOutput(msg.time(), out, out_value);
-	
+  switch (estado) {
+  case Estados::PIDIENDO:
+    sendOutput(msg.time(), pedirLlamada, 1);
+    break;
+  case Estados::ENVIANDO:
+    if (llamada[0] >= 0.0) { // Es llamada valida, la llamada inicial es invalida por lo que hay que descartarla
+      if (llamada[1] == 0.0) {
+        sendOutput(msg.time(), noClientes, llamada);
+      } else {
+        sendOutput(msg.time(), clientes, llamada);
+      }
+    }
+    break;
+  default:
+    MASSERT(false);
+  }
 	return *this;
 
 }
 
 DistribuidorLlamadas::~DistribuidorLlamadas()
 {
-	//TODO: add destruction code here. Free distribution memory, etc. 
+  delete dist;
 }

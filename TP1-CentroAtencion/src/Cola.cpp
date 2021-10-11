@@ -141,6 +141,7 @@ Model &Cola::initFunction()
 {
   llamadasEncoladas.clear();
   recienLibere = false;
+  hayPedido = false;
   return *this ;
 }
 
@@ -155,6 +156,12 @@ Model &Cola::externalFunction( const ExternalMessage &msg )
 	if( msg.port() == entrada )                             	// Si entra una nueva petición
 	{
 		llamadasEncoladas.push_back( msg.value() ) ;             // Encolarla
+    if (!hayPedido) {
+      passivate();
+    } else {
+      hayPedido = false;
+			holdIn( AtomicState::active, preparationTime );
+    }
 	}
 
 	if( msg.port() == liberar )                            // Si notifican condición "listo"
@@ -166,6 +173,9 @@ Model &Cola::externalFunction( const ExternalMessage &msg )
 		if( !llamadasEncoladas.empty() ) {
 			holdIn( AtomicState::active, preparationTime );
 			// Programar siguiente envío
+    } else {
+      hayPedido = true;
+      passivate();
     }
 	}
 

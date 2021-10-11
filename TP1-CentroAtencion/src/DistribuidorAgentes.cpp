@@ -35,44 +35,23 @@ using namespace std;
 ********************************************************************/
 DistribuidorAgentes::DistribuidorAgentes( const string &name ) : 
 	Atomic( name )
-	// TODO: add ports here if needed (Remember to add them to the .h file also). Each in a new line.
-	// Ej:
-	// , out(addOutputPort( "out" ))
-	// , in(addInputPort( "in" ))
-{
-	// TODO: add initialization code here. (reading parameters, initializing private vars, etc)
-	// Code templates for reading parameters:
-	// read string parameter:
-	// 		stringVar = ParallelMainSimulator::Instance().getParameter( description(), "paramName" );
-	// read int parameter:
-	// 		intVar = str2Int( ParallelMainSimulator::Instance().getParameter( description(), "initial" ) );
-	// read time parameter:
-	//		timeVar = string time( ParallelMainSimulator::Instance().getParameter( description(), "preparation" ) ) ;
-	// read distribution parameters:
-	//		dist = Distribution::create( ParallelMainSimulator::Instance().getParameter( description(), "distribution" ) );
-	//		MASSERT( dist ) ;
-	//		for ( register int i = 0; i < dist->varCount(); i++ )
-	//		{
-	//			string parameter( ParallelMainSimulator::Instance().getParameter( description(), dist->getVar( i ) ) ) ;
-	//			dist->setVar( i, str2Value( parameter ) ) ;
-	//		}
-}
+	, pedido(addInputPort( "pedido" ))
+	, entrante(addInputPort( "entrante" ))
+	, pedirLlamada(addOutputPort( "pedirLlamada" ))
+	, agente1(addOutputPort( "agente1" ))
+	, agente2(addOutputPort( "agente2" ))
+{}
 
 /*******************************************************************
 * Function Name: initFunction
 ********************************************************************/
 Model &DistribuidorAgentes::initFunction()
 {
-	// [(!) Initialize common variables]
-	this->elapsed  = VTime::Zero;
- 	this->timeLeft = VTime::Inf;
- 	// this->sigma = VTime::Inf; // stays in active state until an external event occurs;
- 	this->sigma    = VTime::Zero; // force an internal transition in t=0;
+  estado = Estados::DESOCUPADO;
+  luegoDeEnviar = false;
+  llamada = Tuple<Real>({-1.0, -1.0});
 
- 	// TODO: add init code here. (setting first state, etc)
- 	
- 	// set next transition
- 	holdIn( AtomicState::active, this->sigma  ) ;
+  passivate();
 	return *this ;
 }
 
@@ -85,20 +64,34 @@ Model &DistribuidorAgentes::externalFunction( const ExternalMessage &msg )
 #if VERBOSE
 	PRINT_TIMES("dext");
 #endif
-	//[(!) update common variables]	
-	this->sigma    = nextChange();	
-	this->elapsed  = msg.time()-lastChange();	
- 	this->timeLeft = this->sigma - this->elapsed; 
-	
-	//TODO: implement the external function here.
- 	// Remember you can use the msg object (mgs.port(), msg.value()) and you should set the next TA (you might use the holdIn method).
- 	// EJ:
- 	// if( msg.port() == in )
-	//{
-	//	// Do something
-	//	holdIn( AtomicState::active, this->timeLeft );
-	// }
-	
+	//[(!) update common variables]
+
+  if (msg.port() == pedido) {
+    pedidosEnEspera.push_back(*dynamic_pointer_cast<Real>(msg.value()));
+  }
+
+  switch(estado) {
+  case Estados::DESOCUPADO:
+    {
+      if (msg.port() == pedido) {
+        estado = Estados::PIDIENDO;
+        holdIn( AtomicState::active, VTime::Zero );
+      }
+    }
+    break;
+  case Estados::ESPERANDO:
+    {
+      if (msg.port() == entrante) {
+        estado = Estados::ENVIANDO;
+        llamada = *dynamic_pointer_cast<Tuple<Real>>(msg.value());
+        holdIn( AtomicState::active, VTime::Zero );
+      }
+    }
+    break;
+  default:
+    break;
+  }
+
 	return *this ;
 }
 
@@ -112,12 +105,30 @@ Model &DistribuidorAgentes::internalFunction( const InternalMessage &msg )
 #if VERBOSE
 	PRINT_TIMES("dint");
 #endif
-	//TODO: implement the internal function here
 
-	this->sigma = VTime::Inf; // stays in passive state until an external event occurs;
-	holdIn( AtomicState::passive, this->sigma );
+  switch(estado) {
+  case Estados::PIDIENDO:
+    {
+      estado = Estados::ESPERANDO;
+      passivate();
+    }
+    break;
+  case Estados::ENVIANDO:
+    {
+      if (luegoDeEnviar) {
+        estado = Estados::PIDIENDO;
+        holdIn(AtomicState::active, VTime::Zero);
+      } else {
+        estado = Estados::DESOCUPADO;
+        passivate();
+      }
+    }
+    break;
+  default:
+    MASSERT(false);
+    break;
+  }
 	return *this;
-
 }
 
 /*******************************************************************
@@ -127,18 +138,39 @@ Model &DistribuidorAgentes::internalFunction( const InternalMessage &msg )
 ********************************************************************/
 Model &DistribuidorAgentes::outputFunction( const CollectMessage &msg )
 {
-	//TODO: implement the output function here
-	// remember you can use sendOutput(time, outputPort, value) function.
-	// sendOutput( msg.time(), out, 1) ;
-	// value could be a tuple with different number of elements: 
-	// Tuple<Real> out_value{Real(value), 0, 1};
-	// sendOutput(msg.time(), out, out_value);
-	
+  switch(estado) {
+  case Estados::PIDIENDO:
+    {
+      if (pedidosEnEspera.empty()){
+        MASSERT(false);
+      }
+      sendOutput(msg.time(), pedirLlamada, pedidosEnEspera.front());
+    }
+    break;
+  case Estados::ENVIANDO:
+    {
+      if (pedidosEnEspera.empty()){
+        MASSERT(false);
+      }
+      Real id_pedido = pedidosEnEspera.front();
+      pedidosEnEspera.pop_front();
+      if (id_pedido == 1.0) {
+        sendOutput(msg.time(), agente1, llamada);
+      } else {
+        sendOutput(msg.time(), agente2, llamada);
+      }
+      luegoDeEnviar = pedidosEnEspera.empty();
+    }
+    break;
+  default:
+    MASSERT(false);
+    break;
+  }
+
 	return *this;
 
 }
 
 DistribuidorAgentes::~DistribuidorAgentes()
 {
-	//TODO: add destruction code here. Free distribution memory, etc. 
 }

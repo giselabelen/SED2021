@@ -9,8 +9,7 @@
 #define ATOMIC_MODEL_NAME "DistribuidorLlamadas" // cambiar nombre
 
 /** forward declarations **/
-//TODO: add distribution class declaration here if needed
-// Ej: class Distribution ;
+class Distribution;
 
 /** declarations **/
 class DistribuidorLlamadas: public Atomic {
@@ -24,19 +23,21 @@ class DistribuidorLlamadas: public Atomic {
 		Model &internalFunction( const InternalMessage & );
 		Model &outputFunction( const CollectMessage & );
 	private:
-		// [(!) TODO: declare ports, distributions and other private varibles here]
-		/***********      Example declarations   **********************************/
-		// const Port &in;	// this is an input port named 'in'
-		// Port &out ;   	// this is an output port named 'out'
-		// Distribution *dist ;
-		// Distribution &distribution()	{ return *dist; }
-		/**************************************************************************/
+		const Port &entrante;	// this is an input port named 'in'
+    Port &pedirLlamada, &clientes, &noClientes ;   	// this is an output port named 'out'
+		Distribution *dist ;
+		Distribution &distribution()	{ return *dist; }
+
 		// [(!) declare common variables]
+    enum class Estados {
+      PIDIENDO,
+      ESPERANDO,
+      ENVIANDO
+    };
+    Estados estado;
+    Tuple<Real> llamada;
+
 		// Lifetime programmed since the last state transition to the next planned internal transition.
 		VTime sigma;
-		// Time elapsed since the last state transition until now
-		VTime elapsed;
-		// Time remaining to complete the last programmed Lifetime
-		VTime timeLeft;
 };	// class DistribuidorLlamadas
 #endif   //__DISTRIBUIDORLLAMADAS_H

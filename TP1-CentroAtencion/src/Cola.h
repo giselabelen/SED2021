@@ -60,10 +60,8 @@ private:
   Port &salida;
   bool recienLibere;
 
-  // Estados estado;
-  // bool hayPedido;
+  bool hayPedido;
   list<value_ptr> llamadasEncoladas;
-  // bool sigEstado;
 
 	VTime preparationTime;
 };	// class Cola
