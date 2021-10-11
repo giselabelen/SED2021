@@ -35,27 +35,12 @@ using namespace std;
 ********************************************************************/
 Medidor::Medidor( const string &name ) : 
 	Atomic( name )
-	// TODO: add ports here if needed (Remember to add them to the .h file also). Each in a new line.
-	// Ej:
-	// , out(addOutputPort( "out" ))
-	// , in(addInputPort( "in" ))
+	, entrante(addInputPort( "entrante" ))
+	, atendida(addInputPort( "atendida" ))
+	, finalizada(addInputPort( "finalizada" ))
+	, mediciones(addOutputPort( "mediciones" ))
 {
-	// TODO: add initialization code here. (reading parameters, initializing private vars, etc)
-	// Code templates for reading parameters:
-	// read string parameter:
-	// 		stringVar = ParallelMainSimulator::Instance().getParameter( description(), "paramName" );
-	// read int parameter:
-	// 		intVar = str2Int( ParallelMainSimulator::Instance().getParameter( description(), "initial" ) );
-	// read time parameter:
-	//		timeVar = string time( ParallelMainSimulator::Instance().getParameter( description(), "preparation" ) ) ;
-	// read distribution parameters:
-	//		dist = Distribution::create( ParallelMainSimulator::Instance().getParameter( description(), "distribution" ) );
-	//		MASSERT( dist ) ;
-	//		for ( register int i = 0; i < dist->varCount(); i++ )
-	//		{
-	//			string parameter( ParallelMainSimulator::Instance().getParameter( description(), dist->getVar( i ) ) ) ;
-	//			dist->setVar( i, str2Value( parameter ) ) ;
-	//		}
+  periodo = VTime(str2Value( ParallelMainSimulator::Instance().getParameter( description(), "periodo"))) ;
 }
 
 /*******************************************************************
@@ -66,11 +51,8 @@ Model &Medidor::initFunction()
 	// [(!) Initialize common variables]
 	this->elapsed  = VTime::Zero;
  	this->timeLeft = VTime::Inf;
- 	// this->sigma = VTime::Inf; // stays in active state until an external event occurs;
- 	this->sigma    = VTime::Zero; // force an internal transition in t=0;
+ 	this->sigma = periodo;
 
- 	// TODO: add init code here. (setting first state, etc)
- 	
  	// set next transition
  	holdIn( AtomicState::active, this->sigma  ) ;
 	return *this ;
@@ -85,20 +67,34 @@ Model &Medidor::externalFunction( const ExternalMessage &msg )
 #if VERBOSE
 	PRINT_TIMES("dext");
 #endif
-	//[(!) update common variables]	
-	this->sigma    = nextChange();	
-	this->elapsed  = msg.time()-lastChange();	
- 	this->timeLeft = this->sigma - this->elapsed; 
-	
-	//TODO: implement the external function here.
- 	// Remember you can use the msg object (mgs.port(), msg.value()) and you should set the next TA (you might use the holdIn method).
- 	// EJ:
- 	// if( msg.port() == in )
-	//{
-	//	// Do something
-	//	holdIn( AtomicState::active, this->timeLeft );
-	// }
-	
+	//[(!) update common variables]
+	this->sigma    = nextChange();
+	this->elapsed  = msg.time()-lastChange();
+ 	this->timeLeft = this->sigma - this->elapsed;
+
+  if (msg.port() == entrante) {
+    Tuple<Real> llamada = *dynamic_pointer_cast<Tuple<Real>>(msg.value());
+    unsigned int id = static_cast<unsigned int>(llamada[0].value());
+    bool esCliente = llamada[1] == 1.0;
+    entrantesXTiempo[id] = {msg.time(), esCliente};
+    holdIn( AtomicState::active, this->timeLeft );
+  }
+  else if (msg.port() == atendida) {
+    Tuple<Real> llamada = *dynamic_pointer_cast<Tuple<Real>>(msg.value());
+    unsigned int id = static_cast<unsigned int>(llamada[0].value());
+    bool esCliente = llamada[1] == 1.0;
+    atendidasXTiempo[id] = {msg.time(), esCliente};
+    holdIn( AtomicState::active, this->timeLeft );
+  }
+  else  if (msg.port() == finalizada) {
+    Tuple<Real> llamada = *dynamic_pointer_cast<Tuple<Real>>(msg.value());
+    unsigned int id = static_cast<unsigned int>(llamada[0].value());
+    bool esCliente = llamada[1] == 1.0;
+    finalizadasXTiempo[id] = {msg.time(), esCliente};
+    holdIn( AtomicState::active, this->timeLeft );
+  } else {
+    MASSERT(false);
+  }
 	return *this ;
 }
 
@@ -112,10 +108,11 @@ Model &Medidor::internalFunction( const InternalMessage &msg )
 #if VERBOSE
 	PRINT_TIMES("dint");
 #endif
-	//TODO: implement the internal function here
-
-	this->sigma = VTime::Inf; // stays in passive state until an external event occurs;
-	holdIn( AtomicState::passive, this->sigma );
+  entrantesXTiempo.clear();
+  atendidasXTiempo.clear();
+  finalizadasXTiempo.clear();
+  this->sigma = periodo;
+	holdIn( AtomicState::active, this->sigma );
 	return *this;
 
 }
@@ -127,18 +124,41 @@ Model &Medidor::internalFunction( const InternalMessage &msg )
 ********************************************************************/
 Model &Medidor::outputFunction( const CollectMessage &msg )
 {
-	//TODO: implement the output function here
-	// remember you can use sendOutput(time, outputPort, value) function.
-	// sendOutput( msg.time(), out, 1) ;
-	// value could be a tuple with different number of elements: 
-	// Tuple<Real> out_value{Real(value), 0, 1};
-	// sendOutput(msg.time(), out, out_value);
-	
+  Real sumaAtendidas(0.0);
+  Real maxAtendidas(0.0);
+  for (const auto& kv : atendidasXTiempo) {
+    VTime t = kv.second.timestamp - entrantesXTiempo[kv.first].timestamp;
+    sumaAtendidas = sumaAtendidas + Real(t.asSecs());
+    if (Real(t.asSecs()) > maxAtendidas) {
+      maxAtendidas = Real(t.asSecs());
+    }
+  }
+  Real promedioAtendidas(0.0);
+  if (!atendidasXTiempo.empty()) {
+    promedioAtendidas = sumaAtendidas / Real(atendidasXTiempo.size());
+  }
+
+  Real sumaFinalizadas(0.0);
+  Real maxFinalizadas(0.0);
+  for (const auto& kv : finalizadasXTiempo) {
+    VTime t = kv.second.timestamp - entrantesXTiempo[kv.first].timestamp;
+    sumaFinalizadas = sumaFinalizadas + Real(t.asSecs());
+    if (Real(t.asSecs()) > maxFinalizadas) {
+      maxFinalizadas = Real(t.asSecs());
+    }
+  }
+  Real promedioFinalizadas(0.0);
+  if (!finalizadasXTiempo.empty()) {
+    promedioFinalizadas = sumaFinalizadas / Real(finalizadasXTiempo.size());
+  }
+
+  Tuple<Real> m{promedioAtendidas, maxAtendidas, promedioFinalizadas, maxFinalizadas};
+  sendOutput(msg.time(), mediciones, m);
+
 	return *this;
 
 }
 
 Medidor::~Medidor()
 {
-	//TODO: add destruction code here. Free distribution memory, etc. 
 }

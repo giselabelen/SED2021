@@ -20,7 +20,7 @@ link: llamadaAtendida@area2 atendida@medidor
 link: llamadaFinalizada@area2 finalizada@medidor
 
 [generador]
-distribucionLlamada: poisson
+distribution: poisson
 mean: 5
 
 [mesa]
@@ -29,7 +29,7 @@ components: cola@Cola distribuidor@DistribuidorLlamadas
 out: llamadaCliente llamadaNoCliente
 int: entrante
 
-link: entrante entrada@Cola
+link: entrante entrada@cola
 link: clientes@distribuidor llamadaCliente
 link: noClientes@distribuidor llamadaNoCliente
 
@@ -77,4 +77,4 @@ link: pedido@agente1 pedido@distribuidor
 link: pedido@agente2 pedido@distribuidor
 
 [medidor]
-frecuencia: 1
+periodo: 30
