@@ -33,30 +33,14 @@ using namespace std;
 * Function Name: [#MODEL_NAME#]
 * Description: constructor
 ********************************************************************/
-Cola::Cola( const string &name ) : 
+Cola::Cola( const string &name ) :
 	Atomic( name )
 	// TODO: add ports here if needed (Remember to add them to the .h file also). Each in a new line.
 	// Ej:
-	// , out(addOutputPort( "out" ))
-	// , in(addInputPort( "in" ))
-{
-	// TODO: add initialization code here. (reading parameters, initializing private vars, etc)
-	// Code templates for reading parameters:
-	// read string parameter:
-	// 		stringVar = ParallelMainSimulator::Instance().getParameter( description(), "paramName" );
-	// read int parameter:
-	// 		intVar = str2Int( ParallelMainSimulator::Instance().getParameter( description(), "initial" ) );
-	// read time parameter:
-	//		timeVar = string time( ParallelMainSimulator::Instance().getParameter( description(), "preparation" ) ) ;
-	// read distribution parameters:
-	//		dist = Distribution::create( ParallelMainSimulator::Instance().getParameter( description(), "distribution" ) );
-	//		MASSERT( dist ) ;
-	//		for ( register int i = 0; i < dist->varCount(); i++ )
-	//		{
-	//			string parameter( ParallelMainSimulator::Instance().getParameter( description(), dist->getVar( i ) ) ) ;
-	//			dist->setVar( i, str2Value( parameter ) ) ;
-	//		}
-}
+	, entrada(addInputPort( "entrada" ))
+	, liberar(addInputPort( "liberar" ))
+    , salida(addOutputPort( "salida" ))
+{}
 
 /*******************************************************************
 * Function Name: initFunction
@@ -64,15 +48,11 @@ Cola::Cola( const string &name ) :
 Model &Cola::initFunction()
 {
 	// [(!) Initialize common variables]
-	this->elapsed  = VTime::Zero;
- 	this->timeLeft = VTime::Inf;
- 	// this->sigma = VTime::Inf; // stays in active state until an external event occurs;
- 	this->sigma    = VTime::Zero; // force an internal transition in t=0;
-
- 	// TODO: add init code here. (setting first state, etc)
- 	
+    estado = Estados::VACIA;
+    hayPedido = false;
+    sigEstado = false;
  	// set next transition
- 	holdIn( AtomicState::active, this->sigma  ) ;
+    passivate();
 	return *this ;
 }
 
@@ -85,20 +65,27 @@ Model &Cola::externalFunction( const ExternalMessage &msg )
 #if VERBOSE
 	PRINT_TIMES("dext");
 #endif
-	//[(!) update common variables]	
-	this->sigma    = nextChange();	
-	this->elapsed  = msg.time()-lastChange();	
- 	this->timeLeft = this->sigma - this->elapsed; 
-	
-	//TODO: implement the external function here.
- 	// Remember you can use the msg object (mgs.port(), msg.value()) and you should set the next TA (you might use the holdIn method).
- 	// EJ:
- 	// if( msg.port() == in )
-	//{
-	//	// Do something
-	//	holdIn( AtomicState::active, this->timeLeft );
-	// }
-	
+	//[(!) update common variables]
+    if (msg.port() == entrada) {
+        llamadasEncoladas.push_back(msg.value());
+        if (hayPedido) {
+            estado = Estados::LIBERANDO;
+            hayPedido = false;
+            holdIn( AtomicState::active, VTime(0.0) );
+        } else {
+            estado = Estados::ENCOLANDO;
+            passivate();
+        }
+    } else {
+        if (estado == Estados::ENCOLANDO) {
+            estado = Estados::LIBERANDO;
+            holdIn( AtomicState::active, VTime(0.0) );
+        }
+        if (estado == Estados::VACIA) {
+            hayPedido = true;
+            passivate();
+        }
+    }
 	return *this ;
 }
 
@@ -112,10 +99,14 @@ Model &Cola::internalFunction( const InternalMessage &msg )
 #if VERBOSE
 	PRINT_TIMES("dint");
 #endif
-	//TODO: implement the internal function here
-
-	this->sigma = VTime::Inf; // stays in passive state until an external event occurs;
-	holdIn( AtomicState::passive, this->sigma );
+	if (estado == Estados::LIBERANDO) {
+        if (sigEstado) {
+            estado = Estados::ENCOLANDO;
+        } else {
+            estado = Estados::VACIA;
+        }
+    }
+    passivate();
 	return *this;
 
 }
@@ -127,18 +118,14 @@ Model &Cola::internalFunction( const InternalMessage &msg )
 ********************************************************************/
 Model &Cola::outputFunction( const CollectMessage &msg )
 {
-	//TODO: implement the output function here
-	// remember you can use sendOutput(time, outputPort, value) function.
-	// sendOutput( msg.time(), out, 1) ;
-	// value could be a tuple with different number of elements: 
-	// Tuple<Real> out_value{Real(value), 0, 1};
-	// sendOutput(msg.time(), out, out_value);
-	
-	return *this;
-
+    auto llamada = llamadasEncoladas.front();
+    sigEstado = !llamadasEncoladas.empty();
+    sendOutput(msg.time(), salida, *llamada);
+    llamadasEncoladas.pop_front();
+    return *this;
 }
 
 Cola::~Cola()
 {
-	//TODO: add destruction code here. Free distribution memory, etc. 
+    llamadasEncoladas.clear();
 }

@@ -9,8 +9,7 @@
 #define ATOMIC_MODEL_NAME "GeneradorLlamadas" // cambiar nombre
 
 /** forward declarations **/
-//TODO: add distribution class declaration here if needed
-// Ej: class Distribution ;
+class Distribution ;
 
 /** declarations **/
 class GeneradorLlamadas: public Atomic {
@@ -28,12 +27,16 @@ class GeneradorLlamadas: public Atomic {
 	private:
 		// [(!) TODO: declare ports, distributions and other private varibles here]
 		/***********      Example declarations   **********************************/
-		// const Port &in;	// this is an input port named 'in'
-		// Port &out ;   	// this is an output port named 'out'
-		// Distribution *dist ;
-		// Distribution &distribution()	{ return *dist; }
+		const Port &parar;	// this is an input port named 'in'
+		Port &llamada ;   	// this is an output port named 'out'
+		Distribution *dist ;
+		Distribution &distribution()	{ return *dist; }
 		/**************************************************************************/
 	
+        int initial, increment, pid;
+        enum Estados {GENERANDO, PARADO};
+        Estados estado;
+        
 		// [(!) declare common variables]
 		// Lifetime programmed since the last state transition to the next planned internal transition.
 		VTime sigma;

@@ -10,6 +10,7 @@
 #include "tuple_value.h"
 #include "distri.h"        // class Distribution
 #include "strutil.h"
+#include "realfunc.h"
 
 #include "GeneradorLlamadas.h" // Cambiar nombre, base header
 
@@ -34,28 +35,38 @@ using namespace std;
 * Description: constructor
 ********************************************************************/
 GeneradorLlamadas::GeneradorLlamadas( const string &name ) : 
-	Atomic( name )
-	// TODO: add ports here if needed (Remember to add them to the .h file also). Each in a new line.
-	// Ej:
-	// , out(addOutputPort( "out" ))
-	// , in(addInputPort( "in" ))
+	Atomic( name ),
+	parar(addInputPort( "parar" )),
+	llamada(addOutputPort( "llamada" ))
 {
-	// TODO: add initialization code here. (reading parameters, initializing private vars, etc)
-	// Code templates for reading parameters:
-	// read string parameter:
-	// 		stringVar = ParallelMainSimulator::Instance().getParameter( description(), "paramName" );
-	// read int parameter:
-	// 		intVar = str2Int( ParallelMainSimulator::Instance().getParameter( description(), "initial" ) );
-	// read time parameter:
-	//		timeVar = string time( ParallelMainSimulator::Instance().getParameter( description(), "preparation" ) ) ;
-	// read distribution parameters:
-	//		dist = Distribution::create( ParallelMainSimulator::Instance().getParameter( description(), "distribution" ) );
-	//		MASSERT( dist ) ;
-	//		for ( register int i = 0; i < dist->varCount(); i++ )
-	//		{
-	//			string parameter( ParallelMainSimulator::Instance().getParameter( description(), dist->getVar( i ) ) ) ;
-	//			dist->setVar( i, str2Value( parameter ) ) ;
-	//		}
+  try {
+		dist = Distribution::create( ParallelMainSimulator::Instance().getParameter( description(), "distribution" ) );
+		MASSERT( dist ) ;
+		for ( register int i = 0; i < dist->varCount(); i++ )
+		{
+			string parameter( ParallelMainSimulator::Instance().getParameter( description(), dist->getVar( i ) ) ) ;
+			dist->setVar( i, str2Value( parameter ) ) ;
+		}
+
+		if( ParallelMainSimulator::Instance().existsParameter( description(), "initial" ) )
+			initial = str2Int( ParallelMainSimulator::Instance().getParameter( description(), "initial" ) );
+		else
+			initial = 0;
+
+		if( ParallelMainSimulator::Instance().existsParameter( description(), "increment" ) )
+			increment = str2Int( ParallelMainSimulator::Instance().getParameter( description(), "increment" ) );
+		else
+			increment = 1;
+
+	}
+  catch( InvalidDistribution &e )	{
+		e.addText( "The model " + description() + " has distribution problems!" ) ;
+		e.print(cerr);
+		MTHROW( e ) ;
+	}
+  catch( MException &e ) {
+		MTHROW( e ) ;
+	}
 }
 
 /*******************************************************************
@@ -66,11 +77,10 @@ Model &GeneradorLlamadas::initFunction()
 	// [(!) Initialize common variables]
 	this->elapsed  = VTime::Zero;
  	this->timeLeft = VTime::Inf;
- 	// this->sigma = VTime::Inf; // stays in active state until an external event occurs;
  	this->sigma    = VTime::Zero; // force an internal transition in t=0;
 
- 	// TODO: add init code here. (setting first state, etc)
- 	
+  this->estado = Estados::GENERANDO;
+  this->pid = this->initial;
  	// set next transition
  	holdIn( AtomicState::active, this->sigma  ) ;
 	return *this ;
@@ -85,11 +95,11 @@ Model &GeneradorLlamadas::externalFunction( const ExternalMessage &msg )
 #if VERBOSE
 	PRINT_TIMES("dext");
 #endif
-	//[(!) update common variables]	
-	this->sigma    = nextChange();	
-	this->elapsed  = msg.time()-lastChange();	
- 	this->timeLeft = this->sigma - this->elapsed; 
-	
+	//[(!) update common variables]
+	this->sigma    = nextChange();
+	this->elapsed  = msg.time()-lastChange();
+ 	this->timeLeft = this->sigma - this->elapsed;
+
 	//TODO: implement the external function here.
  	// Remember you can use the msg object (mgs.port(), msg.value()) and you should set the next TA (you might use the holdIn method).
  	// EJ:
@@ -98,7 +108,10 @@ Model &GeneradorLlamadas::externalFunction( const ExternalMessage &msg )
 	//	// Do something
 	//	holdIn( AtomicState::active, this->timeLeft );
 	// }
-	
+  if (msg.port() == parar) {
+      estado = Estados::PARADO;
+      passivate();
+  }
 	return *this ;
 }
 
@@ -112,12 +125,9 @@ Model &GeneradorLlamadas::internalFunction( const InternalMessage &msg )
 #if VERBOSE
 	PRINT_TIMES("dint");
 #endif
-	//TODO: implement the internal function here
-
-	this->sigma = VTime::Inf; // stays in passive state until an external event occurs;
-	holdIn( AtomicState::passive, this->sigma );
+	this->sigma = VTime(static_cast< float >(fabs(distribution().get())));
+	holdIn( AtomicState::active, this->sigma );
 	return *this;
-
 }
 
 /*******************************************************************
@@ -130,15 +140,19 @@ Model &GeneradorLlamadas::outputFunction( const CollectMessage &msg )
 	//TODO: implement the output function here
 	// remember you can use sendOutput(time, outputPort, value) function.
 	// sendOutput( msg.time(), out, 1) ;
-	// value could be a tuple with different number of elements: 
+	// value could be a tuple with different number of elements:
 	// Tuple<Real> out_value{Real(value), 0, 1};
 	// sendOutput(msg.time(), out, out_value);
-	
-	return *this;
+  int esCliente = (uniform(0.0, 1.0) > 0.5) ? 1 : 0;
+  Tuple<Real> datos_tupla{static_cast<Real>(pid), static_cast<Real>(esCliente)};
+  pid += increment;
 
+  sendOutput(msg.time(), llamada, datos_tupla);
+
+	return *this;
 }
 
 GeneradorLlamadas::~GeneradorLlamadas()
 {
-	//TODO: add destruction code here. Free distribution memory, etc. 
+    delete dist;
 }
