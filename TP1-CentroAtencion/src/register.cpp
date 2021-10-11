@@ -11,7 +11,7 @@
 void register_atomics_on(ParallelModelAdmin &admin)
 {
 	admin.registerAtomic(NewAtomicFunction< GeneradorLlamadas >(), "GeneradorLlamadas");
-    // admin.registerAtomic(NewAtomicFunction< Cola >(), "Cola");
+    admin.registerAtomic(NewAtomicFunction< Cola >(), "Cola");
     admin.registerAtomic(NewAtomicFunction< Agente >(), "Agente");
     admin.registerAtomic(NewAtomicFunction< DistribuidorLlamadas >(), "DistribuidorLlamadas");
     admin.registerAtomic(NewAtomicFunction< DistribuidorAgentes >(), "DistribuidorAgentes");

@@ -1,4 +1,4 @@
-/** include files **/
+/*
 #include <random>
 #include <string>
 #include <stdlib.h>
@@ -27,12 +27,6 @@ using namespace std;
 		" - sigma: " << sigma << endl;\
 }
 
-/** public functions **/
-
-/*******************************************************************
-* Function Name: [#MODEL_NAME#]
-* Description: constructor
-********************************************************************/
 Cola::Cola( const string &name ) :
 	Atomic( name )
 	// TODO: add ports here if needed (Remember to add them to the .h file also). Each in a new line.
@@ -42,9 +36,6 @@ Cola::Cola( const string &name ) :
     , salida(addOutputPort( "salida" ))
 {}
 
-/*******************************************************************
-* Function Name: initFunction
-********************************************************************/
 Model &Cola::initFunction()
 {
 	// [(!) Initialize common variables]
@@ -56,10 +47,6 @@ Model &Cola::initFunction()
 	return *this ;
 }
 
-/*******************************************************************
-* Function Name: externalFunction
-* Description: This method executes when an external event is received.
-********************************************************************/
 Model &Cola::externalFunction( const ExternalMessage &msg )
 {
 #if VERBOSE
@@ -89,11 +76,6 @@ Model &Cola::externalFunction( const ExternalMessage &msg )
 	return *this ;
 }
 
-/*******************************************************************
-* Function Name: internalFunction
-* Description: This method executes when the TA has expired, right after the outputFunction has finished.
-* The new state and TA should be set.
-********************************************************************/
 Model &Cola::internalFunction( const InternalMessage &msg )
 {
 #if VERBOSE
@@ -111,11 +93,6 @@ Model &Cola::internalFunction( const InternalMessage &msg )
 
 }
 
-/*******************************************************************
-* Function Name: outputFunction
-* Description: This method executes when the TA has expired. After this method the internalFunction is called.
-* Output values can be send through output ports
-********************************************************************/
 Model &Cola::outputFunction( const CollectMessage &msg )
 {
     auto llamada = llamadasEncoladas.front();
@@ -128,4 +105,93 @@ Model &Cola::outputFunction( const CollectMessage &msg )
 Cola::~Cola()
 {
     llamadasEncoladas.clear();
+}
+*/
+
+#include <string>
+#include "Cola.h"
+#include "message.h"
+#include "parsimu.h"
+
+using namespace std;
+
+/*******************************************************************
+* Nombre de la Funci¢n: Cola::Cola()
+* Descripción: Constructor
+********************************************************************/
+Cola::Cola( const string &name ): Atomic( name )
+                                , entrada( addInputPort( "entrada" ) )
+	                              , liberar( addInputPort( "liberar" ) )
+                                , salida( addOutputPort( "salida" ) )
+                                , preparationTime( 0, 0, 0, 1 )
+{
+	string time( ParallelMainSimulator::Instance().getParameter( description(), "preparation" ) ) ;
+
+	if( time != "" )
+		preparationTime = time ;
+}
+
+
+/*******************************************************************
+* Nombre de la Función: Cola::initFunction()
+* Descripción: Función de Inicialización
+********************************************************************/
+
+Model &Cola::initFunction()
+{
+  llamadasEncoladas.clear();
+  recienLibere = false;
+  return *this ;
+}
+
+
+/*******************************************************************
+* Nombre de la Función: Cola::externalFunction()
+* Descripción: Maneja los eventos externos (nuevas solicitudes y aviso de "listo"
+********************************************************************/
+
+Model &Cola::externalFunction( const ExternalMessage &msg )
+{
+	if( msg.port() == entrada )                             	// Si entra una nueva petición
+	{
+		llamadasEncoladas.push_back( msg.value() ) ;             // Encolarla
+	}
+
+	if( msg.port() == liberar )                            // Si notifican condición "listo"
+	{
+    if ( recienLibere && !llamadasEncoladas.empty()) {
+		    llamadasEncoladas.pop_front() ;                          // Eliminar ultima entraga de cola
+        recienLibere = false;
+    }
+		if( !llamadasEncoladas.empty() ) {
+			holdIn( AtomicState::active, preparationTime );
+			// Programar siguiente envío
+    }
+	}
+
+	return *this;
+}
+
+/*******************************************************************
+* Nombre de la Función: Cola::internalFunction()
+* Descripción: Pone el modelo en estado pasivo (esperando un "Done" o algo para enviar)
+********************************************************************/
+Model &Cola::internalFunction( const InternalMessage & )
+{
+	passivate();
+	return *this ;
+}
+
+
+/*******************************************************************
+* Nombre de la Función: Cola::outputFunction()
+* Descripción: Envía solicitud al receptor
+********************************************************************/
+Model &Cola::outputFunction( const CollectMessage &msg )
+{
+	if( !llamadasEncoladas.empty() ) {   // Si la cola no está vacía, enviar primer elemento
+		sendOutput( msg.time(), salida, *llamadasEncoladas.front() ) ;
+    recienLibere = true;
+  }
+	return *this ;
 }
