@@ -3,13 +3,13 @@ components : rayos
 
 [rayos]
 type : cell
-dim : (10, 10, 2)
+dim : (100, 100, 2)
 delay : transport
 border : nowrapped
 neighbors : rayos(0,-1,0)  rayos(0,0,0)  rayos(0,1,0)
 neighbors : rayos(0,-1,1)  rayos(0,0,1)  rayos(0,1,1)
 initialValue : 0.0
-initialCellsValue: estado_10_10.val
+initialCellsValue: estado_100_100.val
 localtransition : rayos-rule
 defaultDelayTime : 0.0
 
@@ -32,12 +32,12 @@ rule : {0.0} 100 {cellpos(2) = 0 and (0,0,0) > 0 and (0,1,0) > 0}
 % Regla borde derecho
 % En las celdas de la última columna, se mantiene el valor 0 mientras su vecino izquierdo no tenga valor distinto de 0.
 
-rule : {(0,0,0)} 100 {cellpos(2) = 0 and cellpos(1) = 9 and (0, -1, 0) = 0 and (0,0,0) = 0}
+rule : {(0,0,0)} 100 {cellpos(2) = 0 and cellpos(1) = 99 and (0, -1, 0) = 0 and (0,0,0) = 0}
 
 % Regla output
 % En las celdas de la última columna, si su vecino izquierdo tiene un valor de intensidad mayor a 0, se toma ese valor.
 
-rule : {(0,-1,0)} 100 {cellpos(2) = 0 and cellpos(1) = 9 and (0, -1, 0) > 0 }
+rule : {(0,-1,0)} 100 {cellpos(2) = 0 and cellpos(1) = 99 and (0, -1, 0) > 0 }
 
 % Regla default
 % Es siempre verdadera. Mantiene el valor actual de la celda.
