@@ -27,7 +27,7 @@ rule : {(0,-1,0) * exp(-1.0 * (0,0,1))} 100 {cellpos(2) = 0 and (0,0,0) = 0 and 
 % Regla ya avance
 % Si mi valor en intensidades no es 0 y a mi derecha hay un valor mayor a 0, significa que el rayo ya paso, me pongo en 0.
 
-rule : {0.0} 100 {cellpos(2) = 0 and (0,0,0) > 0 and (0,1,0) > 0}
+rule : {0.0} 0 {cellpos(2) = 0 and (0,0,0) > 0 and (0,1,0) > 0}
 
 % Regla borde derecho
 % En las celdas de la última columna, se mantiene el valor 0 mientras su vecino izquierdo no tenga valor distinto de 0.
