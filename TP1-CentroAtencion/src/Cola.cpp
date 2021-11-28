@@ -142,6 +142,7 @@ Model &Cola::initFunction()
   llamadasEncoladas.clear();
   recienLibere = false;
   hayPedido = false;
+    enProceso = false;
   return *this ;
 }
 
@@ -156,27 +157,42 @@ Model &Cola::externalFunction( const ExternalMessage &msg )
 	if( msg.port() == entrada )                             	// Si entra una nueva petición
 	{
 		llamadasEncoladas.push_back( msg.value() ) ;             // Encolarla
-    if (!hayPedido) {
+    if (!hayPedido && !enProceso) {
       passivate();
     } else {
-      hayPedido = false;
-			holdIn( AtomicState::active, preparationTime );
+        if (hayPedido) {
+          hayPedido = false;
+            enProceso = true;
+		  holdIn( AtomicState::active, preparationTime );
+        }
+        else if (enProceso) {
+            auto sigma    = nextChange();
+            auto elapsed  = msg.time()-lastChange();
+            auto timeLeft = sigma - elapsed;
+            holdIn( AtomicState::active,  sigma);
+        }
     }
 	}
 
 	if( msg.port() == liberar )                            // Si notifican condición "listo"
 	{
-    if ( recienLibere && !llamadasEncoladas.empty()) {
-		    llamadasEncoladas.pop_front() ;                          // Eliminar ultima entraga de cola
-        recienLibere = false;
-    }
-		if( !llamadasEncoladas.empty() ) {
+        if ( recienLibere && !llamadasEncoladas.empty()) {
+                llamadasEncoladas.pop_front() ;                          // Eliminar ultima entrega de cola
+            recienLibere = false;
+        }
+		if( !llamadasEncoladas.empty() && !enProceso) {
+            enProceso = true;
 			holdIn( AtomicState::active, preparationTime );
 			// Programar siguiente envío
-    } else {
-      hayPedido = true;
-      passivate();
-    }
+        }  else if ( !llamadasEncoladas.empty() && enProceso ) {
+            auto sigma    = nextChange();
+            auto elapsed  = msg.time()-lastChange();
+            auto timeLeft = sigma - elapsed;
+   			holdIn( AtomicState::active, sigma );
+        } else {
+          hayPedido = true;
+          passivate();
+        }
 	}
 
 	return *this;
@@ -201,7 +217,8 @@ Model &Cola::outputFunction( const CollectMessage &msg )
 {
 	if( !llamadasEncoladas.empty() ) {   // Si la cola no está vacía, enviar primer elemento
 		sendOutput( msg.time(), salida, *llamadasEncoladas.front() ) ;
-    recienLibere = true;
+        recienLibere = true;
+        enProceso = false;
   }
 	return *this ;
 }

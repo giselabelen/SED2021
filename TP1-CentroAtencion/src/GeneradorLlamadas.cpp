@@ -77,11 +77,13 @@ Model &GeneradorLlamadas::initFunction()
 	// [(!) Initialize common variables]
 	this->elapsed  = VTime::Zero;
  	this->timeLeft = VTime::Inf;
- 	this->sigma    = VTime::Zero; // force an internal transition in t=0;
+ 	// this->sigma    = VTime::Zero; // force an internal transition in t=0;
 
   this->estado = Estados::GENERANDO;
   this->pid = this->initial;
  	// set next transition
+  	this->sigma = VTime(static_cast< float >(fabs(distribution().get())));
+
  	holdIn( AtomicState::active, this->sigma  ) ;
 	return *this ;
 }

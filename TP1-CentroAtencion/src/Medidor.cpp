@@ -77,21 +77,24 @@ Model &Medidor::externalFunction( const ExternalMessage &msg )
     unsigned int id = static_cast<unsigned int>(llamada[0].value());
     bool esCliente = llamada[1] == 1.0;
     entrantesXTiempo[id] = {msg.time(), esCliente};
-    holdIn( AtomicState::active, this->timeLeft );
+    // holdIn( AtomicState::active, this->timeLeft );
+    holdIn( AtomicState::active, this->sigma );
   }
   else if (msg.port() == atendida) {
     Tuple<Real> llamada = *dynamic_pointer_cast<Tuple<Real>>(msg.value());
     unsigned int id = static_cast<unsigned int>(llamada[0].value());
     bool esCliente = llamada[1] == 1.0;
     atendidasXTiempo[id] = {msg.time(), esCliente};
-    holdIn( AtomicState::active, this->timeLeft );
+    // holdIn( AtomicState::active, this->timeLeft );
+    holdIn( AtomicState::active, this->sigma );
   }
   else  if (msg.port() == finalizada) {
     Tuple<Real> llamada = *dynamic_pointer_cast<Tuple<Real>>(msg.value());
     unsigned int id = static_cast<unsigned int>(llamada[0].value());
     bool esCliente = llamada[1] == 1.0;
     finalizadasXTiempo[id] = {msg.time(), esCliente};
-    holdIn( AtomicState::active, this->timeLeft );
+    // holdIn( AtomicState::active, this->timeLeft );
+    holdIn( AtomicState::active, this->sigma );
   } else {
     MASSERT(false);
   }
@@ -108,7 +111,7 @@ Model &Medidor::internalFunction( const InternalMessage &msg )
 #if VERBOSE
 	PRINT_TIMES("dint");
 #endif
-  entrantesXTiempo.clear();
+  // entrantesXTiempo.clear();
   atendidasXTiempo.clear();
   finalizadasXTiempo.clear();
   this->sigma = periodo;

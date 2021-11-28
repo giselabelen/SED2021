@@ -61,6 +61,7 @@ private:
   bool recienLibere;
 
   bool hayPedido;
+  bool enProceso;
   list<value_ptr> llamadasEncoladas;
 
 	VTime preparationTime;
