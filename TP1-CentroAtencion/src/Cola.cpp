@@ -121,7 +121,7 @@ using namespace std;
 ********************************************************************/
 Cola::Cola( const string &name ): Atomic( name )
                                 , entrada( addInputPort( "entrada" ) )
-	                              , liberar( addInputPort( "liberar" ) )
+	                            , liberar( addInputPort( "liberar" ) )
                                 , salida( addOutputPort( "salida" ) )
                                 , preparationTime( 0, 0, 0, 1 )
 {
@@ -142,7 +142,7 @@ Model &Cola::initFunction()
   llamadasEncoladas.clear();
   recienLibere = false;
   hayPedido = false;
-    enProceso = false;
+  enProceso = false;
   return *this ;
 }
 
@@ -157,27 +157,27 @@ Model &Cola::externalFunction( const ExternalMessage &msg )
 	if( msg.port() == entrada )                             	// Si entra una nueva petición
 	{
 		llamadasEncoladas.push_back( msg.value() ) ;             // Encolarla
-    if (!hayPedido && !enProceso) {
-      passivate();
-    } else {
-        if (hayPedido) {
-          hayPedido = false;
+        if (!hayPedido && !enProceso) {
+          passivate();
+        } else {
+          if (hayPedido) {
+            hayPedido = false;
             enProceso = true;
-		  holdIn( AtomicState::active, preparationTime );
-        }
-        else if (enProceso) {
+		    holdIn( AtomicState::active, preparationTime );
+          }
+          else if (enProceso) {
             auto sigma    = nextChange();
             auto elapsed  = msg.time()-lastChange();
             auto timeLeft = sigma - elapsed;
             holdIn( AtomicState::active,  sigma);
+          }
         }
-    }
 	}
 
 	if( msg.port() == liberar )                            // Si notifican condición "listo"
 	{
         if ( recienLibere && !llamadasEncoladas.empty()) {
-                llamadasEncoladas.pop_front() ;                          // Eliminar ultima entrega de cola
+            llamadasEncoladas.pop_front() ;                          // Eliminar ultima entrega de cola
             recienLibere = false;
         }
 		if( !llamadasEncoladas.empty() && !enProceso) {

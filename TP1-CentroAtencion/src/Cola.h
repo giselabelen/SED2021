@@ -58,13 +58,14 @@ protected:
 private:
   const Port &entrada, &liberar;
   Port &salida;
+  
   bool recienLibere;
-
   bool hayPedido;
   bool enProceso;
+  
   list<value_ptr> llamadasEncoladas;
 
-	VTime preparationTime;
+  VTime preparationTime;
 };	// class Cola
 #endif   //__COLA_H
 
