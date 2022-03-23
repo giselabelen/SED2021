@@ -36,14 +36,17 @@ class MAParser:
         self.value_link_own = pp.Word(pp.printables)
         self.value_link_other = pp.Word(pp.printables) + self.keyword_link_at + pp.Word(pp.printables)
         self.value_link = pp.Or(self.value_link_own, self.value_link_other)
-        self.word_link = self.keyword_link + self.keyword_assign_attribute + pp.OneOrMore(self.value_link)
+        self.word_link = self.keyword_link + self.keyword_assign_attribute + self.value_link + self.value_link
         self.word_link.setParseAction(lambda s, l, t: ["LINK", *t[2:]])
 
-        self.word_user_attribute = pp.Word(pp.printables) + self.keyword_assign_attribute + pp.OneOrMore(
+        self.keyword_user_attr = pp.Word(pp.printables)
+        # Necesario para que no se tome a link como un atributo de usuario
+        self.keyword_user_attr.addCondition(lambda s, loc, toks: toks[0].lower() != "link")
+        self.word_user_attribute = self.keyword_user_attr + self.keyword_assign_attribute + pp.OneOrMore(
             pp.Word(pp.printables))
         self.word_user_attribute.setParseAction(lambda s, l, t: ["ATTR", t[0], *t[2:]])
-        self.word_attribute = self.word_components("COMPONENTS") ^ self.word_in("IN") ^ self.word_out(
-            "OUT") ^ self.word_link("LINK") ^ self.word_user_attribute("ATTR")
+        self.word_attribute = self.word_components("COMPONENTS") | self.word_in("IN") | self.word_out(
+            "OUT") | self.word_link("LINK") | self.word_user_attribute("ATTR")
 
         self.word_header = self.keyword_begin_model_name + pp.Word(pp.alphas) + self.keyword_end_model_name
         self.word_header.setParseAction(lambda s, l, t: ["MODEL_DEF", t[1]])
@@ -101,14 +104,12 @@ class MAParser:
         context["MODELS"][current_model]["IS_ATOMIC"] = False
         return context
 
-    @staticmethod
     def _parse_in_(self, data, context):
         assert len(data) > 0, "In statement has insufficient parameters"
         current_model = context["CURRENT_MODEL"]
         context["MODELS"][current_model]["IN"] = data
         return context
 
-    @staticmethod
     def _parse_out_(self, data, context):
         assert len(data) > 0, "Out statement has insufficient parameters"
         current_model = context["CURRENT_MODEL"]
@@ -136,9 +137,8 @@ class MAParser:
         context["MODELS"][current_model]["LINK"].append((from_port, to_port))
         return context
 
-    @staticmethod
     def _parse_attr_(self, data, context):
-        assert len(data) > 1, "Attribute has insuficcient parameters"
+        assert len(data) > 1, "Attribute has insufficient parameters"
         current_model = context["CURRENT_MODEL"]
         name = data[0]
         values = data[1:]
@@ -188,7 +188,6 @@ class MAParser:
                 return None
             return self.parser.parseString(line)
         except pp.ParseException as e:
-            print(e.line)
             raise MAParserError
 
     def parse_line(self, scanned_line, context):
