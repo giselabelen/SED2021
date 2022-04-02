@@ -77,6 +77,27 @@ def test_scan_line_user_attribute(parser):
     assert parser.scan_line("distribution : normal")[0:3] == ["ATTR", "distribution", "normal"]
 
 
+def test_scan_line_empty_statements_cause_exceptions(parser):
+    """
+    Empty statements or with insufficient parameters cause exceptions
+    """
+    with pytest.raises(Exception) as exc_info:
+        parser.scan_line("[]")
+    with pytest.raises(Exception) as exc_info:
+        parser.scan_line("components : ")
+    with pytest.raises(Exception) as exc_info:
+        parser.scan_line("in : ")
+    with pytest.raises(Exception) as exc_info:
+        parser.scan_line("out : ")
+    with pytest.raises(Exception) as exc_info:
+        parser.scan_line("link : ")
+    with pytest.raises(Exception) as exc_info:
+        parser.scan_line("link : test")
+    with pytest.raises(Exception) as exc_info:
+        parser.scan_line("link : t@test")
+    with pytest.raises(Exception) as exc_info:
+        parser.scan_line("distribution : ")
+
 #
 # scan_text_tests
 #
@@ -265,6 +286,7 @@ def test_parse_line_attr_single_value_(parser, context):
     """
     context = parser.parse_line(parser.scan_line("[test]"), context)
     context = parser.parse_line(parser.scan_line("distribution : normal"), context)
+
     assert len(context["MODELS"]["test"]["ATTR"]) == 1
     assert ("distribution", ["normal"]) in context["MODELS"]["test"]["ATTR"]
 
@@ -278,30 +300,39 @@ def test_parse_line_attr_complex_(parser, context):
     context = parser.parse_line(parser.scan_line("mean : 3"), context)
     context = parser.parse_line(parser.scan_line("deviation : 1"), context)
     context = parser.parse_line(parser.scan_line("initial : 1"), context)
+
     assert len(context["MODELS"]["test"]["ATTR"]) == 4
     assert ("distribution", ["normal"]) in context["MODELS"]["test"]["ATTR"]
     assert ("mean", ["3"]) in context["MODELS"]["test"]["ATTR"]
     assert ("deviation", ["1"]) in context["MODELS"]["test"]["ATTR"]
     assert ("initial", ["1"]) in context["MODELS"]["test"]["ATTR"]
 
+# parse_text test
 
-def test_scan_line_empty_statements_cause_exceptions(parser):
-    """
-    Empty statements or with insufficient parameters cause exceptions
-    """
-    with pytest.raises(Exception) as exc_info:
-        parser.scan_line("[]")
-    with pytest.raises(Exception) as exc_info:
-        parser.scan_line("components : ")
-    with pytest.raises(Exception) as exc_info:
-        parser.scan_line("in : ")
-    with pytest.raises(Exception) as exc_info:
-        parser.scan_line("out : ")
-    with pytest.raises(Exception) as exc_info:
-        parser.scan_line("link : ")
-    with pytest.raises(Exception) as exc_info:
-        parser.scan_line("link : test")
-    with pytest.raises(Exception) as exc_info:
-        parser.scan_line("link : t@test")
-    with pytest.raises(Exception) as exc_info:
-        parser.scan_line("distribution : ")
+def test_parse_text_example_simple(parser, context):
+    context = parser.parse_text(examples.EXAMPLE_SIMPLE)
+
+    assert len(context["MODEL_DEFINITIONS"]) == 2
+
+    assert "top" in context["MODEL_DEFINITIONS"]
+    assert "top" in context["MODELS"].keys()
+    assert not context["MODELS"]["top"]["IS_ATOMIC"]
+    assert ("ATOMIC", "generator", "generator") in context["MODELS"]["top"]["COMPONENTS"]
+    assert "out_port" in context["MODELS"]["top"]["OUT"]
+    assert "stop" in context["MODELS"]["top"]["IN"]
+    assert  len(context["MODELS"]["top"]["LINK"]) == 2
+    assert (("LOCAL_PORT", "stop"), ("REMOTE_PORT", "stop", "generator")) in context["MODELS"]["top"]["LINK"]
+    assert (("REMOTE_PORT", "out", "generator"), ("LOCAL_PORT", "out_port")) in context["MODELS"]["top"]["LINK"]
+
+    assert "generator" in context["MODEL_DEFINITIONS"]
+    assert "generator" in context["MODELS"].keys()
+    assert context["MODELS"]["generator"]["IS_ATOMIC"]
+    assert len(context["MODELS"]["generator"]["ATTR"]) == 5
+    assert ("distribution", ["normal"]) in context["MODELS"]["generator"]["ATTR"]
+    assert ("mean", ["3"]) in context["MODELS"]["generator"]["ATTR"]
+    assert ("deviation", ["1"]) in context["MODELS"]["generator"]["ATTR"]
+    assert ("initial", ["1"]) in context["MODELS"]["generator"]["ATTR"]
+    assert ("increment", ["5"]) in context["MODELS"]["generator"]["ATTR"]
+
+def test_parse_text_example_complex(parser, context):
+    context = parser.parse_text(examples.EXAMPLE_COMPLEX)
