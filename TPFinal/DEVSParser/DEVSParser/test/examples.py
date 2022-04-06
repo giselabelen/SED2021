@@ -17,7 +17,7 @@ increment : 5
 EXAMPLE_COMPLEX = """
 [Top]
 components : TrafficGenerator@Generator network 
-out : out generator_out 
+out : out generator_out
 in : setNetworkDelay 
 Link : setNetworkDelay setDelay@network
 Link : out@TrafficGenerator in@network

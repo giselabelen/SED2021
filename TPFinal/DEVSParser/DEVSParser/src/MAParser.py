@@ -217,21 +217,30 @@ class MAParser:
 
     @staticmethod
     def _validate_composite_links_are_valid_(model_name, context):
-        for (in_port, out_port) in context["MODELS"][model_name]["LINK"]:
-            if in_port[0] == "LOCAL_PORT" and \
-                in_port[1] not in context["MODELS"][model_name]["IN"]:
-                raise MAParserError(f"ERROR: IN-port name {in_port[1]} is not defined for model {model_name}")
-            elif in_port[0] == "REMOTE_PORT" and \
-                not context["MODELS"][in_port[2]]["IS_ATOMIC"] and \
-                in_port[1] not in context["MODELS"][in_port[2]]["IN"]:
-                raise MAParserError(f"ERROR: IN-port name {in_port[1]} is not defined for model {in_port[2]}")
-            if out_port[0] == "LOCAL_PORT" and \
-                out_port[1] not in context["MODELS"][model_name]["OUT"]:
-                raise MAParserError(f"ERROR: OUT-port name {in_port[1]} is not defined for model {model_name}")
-            elif out_port[0] == "REMOTE_PORT" and \
-                not context["MODELS"][out_port[2]]["IS_ATOMIC"] and \
-                out_port[1] not in context["MODELS"][out_port[2]]["OUT"]:
-                raise MAParserError(f"ERROR: OUT-port name {out_port[1]} is not defined for model {out_port[2]}")
+        def is_valid_port(type, port, model, context):
+            if type == "LOCAL_PORT" and \
+                port not in context["MODELS"][model]["IN"] and \
+                port not in context["MODELS"][model]["OUT"]:
+                raise MAParserError(f"ERROR: port name {port} is not defined for model {model}")
+            elif type == "REMOTE_PORT" and \
+                not context["MODELS"][model]["IS_ATOMIC"] and \
+                port not in context["MODELS"][model]["IN"] and \
+                port not in context["MODELS"][model]["OUT"]:
+                raise MAParserError(f"ERROR: port name {port} is not defined for model {model}")
+        for (source_port_desc, dest_port_desc) in context["MODELS"][model_name]["LINK"]:
+            source_type, source_port, *source_model = source_port_desc
+            dest_type, dest_port, *dest_model = dest_port_desc
+            if not source_model:
+                source_model = model_name
+            else:
+                source_model = source_model[0]
+            if not dest_model:
+                dest_model = model_name
+            else:
+                dest_model = dest_model[0]
+            is_valid_port(source_type, source_port, source_model, context)
+            is_valid_port(dest_type, dest_port, dest_model, context)
+
 
     def validate_context(self, context):
         for model_name in context["MODEL_DEFINITIONS"]:
