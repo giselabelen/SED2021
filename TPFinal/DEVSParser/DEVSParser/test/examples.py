@@ -1,17 +1,86 @@
 EXAMPLE_SIMPLE = """
 [top]
-components : generator@generator
-out : out_port
-in : stop
-link : stop stop@generator
-link : out@generator out_port
+components: generator@generator
+out: out_port
+in: stop
+link: stop stop@generator
+link: out@generator out_port
 
 [generator]
-distribution : normal
-mean : 3
-deviation : 1
-initial : 1
-increment : 5
+distribution: normal
+mean: 3
+deviation: 1
+initial: 1
+increment: 5
+"""
+
+EXAMPLE_ERROR_NO_COMPONENTS_DEF = """
+[top]
+components: generator@generator
+"""
+
+EXAMPLE_ERROR_NO_COMPONENTS_COMPOSITE_DEF = """
+[top]
+components: test
+"""
+
+EXAMPLE_ERROR_MISSING_COMPONENTS = """
+[top]
+components: 
+"""
+
+EXAMPLE_ERROR_NO_DECLARED_PORT = """
+[top]
+components: generator@generator
+link: stop stop@generator
+link: out@generator out_port
+
+[generator]
+distribution: normal
+mean: 3
+deviation: 1
+initial: 1
+increment: 5
+"""
+
+EXAMPLE_ERROR_ATOMIC_WITH_IN_PORT = """
+[top]
+out: out_port
+in: stop
+link: stop stop@generator
+link: out@generator out_port
+
+[generator]
+distribution: normal
+mean: 3
+deviation: 1
+initial: 1
+increment: 5
+"""
+
+EXAMPLE_ERROR_ATOMIC_WITH_OUT_PORT = """
+[top]
+out: out_port
+link: out@generator out_port
+
+[generator]
+distribution: normal
+mean: 3
+deviation: 1
+initial: 1
+increment: 5
+"""
+
+EXAMPLE_ERROR_ATOMIC_WITH_LINK = """
+[top]
+link: out@generator out_port
+
+[generator]
+distribution: normal
+mean: 3
+deviation: 1
+initial: 1
+increment: 5
 """
 
 EXAMPLE_COMPLEX = """

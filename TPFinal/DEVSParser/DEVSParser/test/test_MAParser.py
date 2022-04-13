@@ -2,19 +2,28 @@ from DEVSParser.src import MAParser
 import pytest
 from . import examples
 
-MODEL_DEFINITIONS = "MODEL_DEFINITIONS"
-MODELS = "MODELS"
-CURRENT_MODEL = "CURRENT_MODEL"
+TOKEN_TYPE = MAParser.MATokens
+
+# Model structure fields
 IN = "IN"
 OUT = "OUT"
 LINK = "LINK"
 COMPONENTS = "COMPONENTS"
 ATTR = "ATTR"
-LOCAL_PORT = "LOCAL_PORT"
-REMOTE_PORT = "REMOTE_PORT"
+
+IS_ATOMIC = "IS_ATOMIC"
+
+# Context fields
+MODEL_DEFINITIONS = "MODEL_DEFINITIONS"
+MODELS = "MODELS"
+CURRENT_MODEL = "CURRENT_MODEL"
+
+# Model attributes
 ATOMIC = "ATOMIC"
 COMPOSITE = "COMPOSITE"
-IS_ATOMIC = "IS_ATOMIC"
+LOCAL_PORT = "LOCAL_PORT"
+REMOTE_PORT = "REMOTE_PORT"
+
 
 @pytest.fixture
 def parser():
@@ -23,7 +32,7 @@ def parser():
 
 @pytest.fixture
 def context():
-    return MAParser.MAParser._create_context_()
+    return MAParser.MAParser.empty_context()
 
 #
 # scan_line_tests
@@ -35,81 +44,99 @@ def test_scan_line_empty(parser):
 
 
 def test_scan_line_comment_empty(parser):
-    assert parser.scan_line("%")[0:1] == ["COMMENT"]
+    assert parser.scan_line("%")[0:1] == [TOKEN_TYPE.COMMENT]
 
 
 def test_scan_line_comment_simple(parser):
-    assert parser.scan_line("% test comment")[0:3] == ["COMMENT", "test", "comment"]
+    assert parser.scan_line("% test comment")[0:3] == [TOKEN_TYPE.COMMENT, "test", "comment"]
 
 
 def test_scan_line_simple_header(parser):
-    assert parser.scan_line("[ hello ]")[0:2] == ["MODEL_DEF", "hello"]
+    assert parser.scan_line("[ hello ]")[0:2] == [TOKEN_TYPE.MODEL_DEF, "hello"]
 
 
 def test_scan_line_simple_header_no_whitespace(parser):
-    assert parser.scan_line("[hello]")[0:2] == ["MODEL_DEF", "hello"]
+    assert parser.scan_line("[hello]")[0:2] == [TOKEN_TYPE.MODEL_DEF, "hello"]
 
 
 def test_scan_line_complex_header(parser):
-    assert parser.scan_line("[ helloWorld ]")[0:2] == ["MODEL_DEF", "helloWorld"]
+    assert parser.scan_line("[ helloWorld ]")[0:2] == [TOKEN_TYPE.MODEL_DEF, "helloWorld"]
 
 
 def test_scan_line_simple_components(parser):
-    assert parser.scan_line("components : test")[0:3] == ["COMPONENTS", "test"]
+    assert parser.scan_line("components : test")[0:2] == [TOKEN_TYPE.COMPONENTS, "test"]
 
 
 def test_scan_line_complex_components(parser):
-    assert parser.scan_line("components : test@generator")[0:3] == ["COMPONENTS", "test@generator"]
+    assert parser.scan_line("components : test@generator")[0:2] == [TOKEN_TYPE.COMPONENTS, "test@generator"]
 
 
 def test_scan_line_simple_in(parser):
-    assert parser.scan_line("in : port")[0:3] == ["IN", "port"]
+    assert parser.scan_line("in : port")[0:2] == [TOKEN_TYPE.IN, "port"]
 
 
 def test_scan_line_complex_in(parser):
-    assert parser.scan_line("in : port1 port2")[0:4] == ["IN", "port1", "port2"]
+    assert parser.scan_line("in : port1 port2")[0:3] == [TOKEN_TYPE.IN, "port1", "port2"]
 
 
 def test_scan_line_simple_out(parser):
-    assert parser.scan_line("out : port")[0:3] == ["OUT", "port"]
+    assert parser.scan_line("out : port")[0:2] == [TOKEN_TYPE.OUT, "port"]
 
 
 def test_scan_line_complex_out(parser):
-    assert parser.scan_line("out : port1 port2")[0:4] == ["OUT", "port1", "port2"]
+    assert parser.scan_line("out : port1 port2")[0:3] == [TOKEN_TYPE.OUT, "port1", "port2"]
 
 
 def test_scan_line_outgoing_link(parser):
-    assert parser.scan_line("link : port port@test")[0:4] == ["LINK", "port", "port@test"]
+    assert parser.scan_line("link : port port@test")[0:3] == [TOKEN_TYPE.LINK, "port", "port@test"]
 
 
 def test_scan_line_incoming_link(parser):
-    assert parser.scan_line("link : port@test port ")[0:4] == ["LINK", "port@test", "port"]
+    assert parser.scan_line("link : port@test port ")[0:3] == [TOKEN_TYPE.LINK, "port@test", "port"]
 
 
 def test_scan_line_user_attribute(parser):
-    assert parser.scan_line("distribution : normal")[0:3] == ["ATTR", "distribution", "normal"]
+    assert parser.scan_line("distribution : normal")[0:3] == [TOKEN_TYPE.ATTR, "distribution", "normal"]
 
 
 def test_scan_line_empty_statements_cause_exceptions(parser):
     """
     Empty statements or with insufficient parameters cause exceptions
     """
-    with pytest.raises(Exception) as exc_info:
+    ERROR_MSG = "ERROR: An error ocurred while scanning."
+
+    with pytest.raises(MAParser.MAParserError) as e:
         parser.scan_line("[]")
-    with pytest.raises(Exception) as exc_info:
+    assert str(e.value) == ERROR_MSG + " Col 3 Line 1. Content: '[]'."
+
+    with pytest.raises(MAParser.MAParserError) as e:
         parser.scan_line("components : ")
-    with pytest.raises(Exception) as exc_info:
+    assert str(e.value) == ERROR_MSG + " Col 14 Line 1. Content: 'components : '."
+
+    with pytest.raises(MAParser.MAParserError) as e:
         parser.scan_line("in : ")
-    with pytest.raises(Exception) as exc_info:
+    assert str(e.value) == ERROR_MSG + " Col 6 Line 1. Content: 'in : '."
+
+    with pytest.raises(MAParser.MAParserError) as e:
         parser.scan_line("out : ")
-    with pytest.raises(Exception) as exc_info:
+    assert str(e.value) == ERROR_MSG + " Col 7 Line 1. Content: 'out : '."
+
+    with pytest.raises(MAParser.MAParserError) as e:
         parser.scan_line("link : ")
-    with pytest.raises(Exception) as exc_info:
+    assert str(e.value) == ERROR_MSG + " Col 8 Line 1. Content: 'link : '."
+
+    with pytest.raises(MAParser.MAParserError) as e:
         parser.scan_line("link : test")
-    with pytest.raises(Exception) as exc_info:
+    assert str(e.value) == ERROR_MSG + " Col 12 Line 1. Content: 'link : test'."
+
+    with pytest.raises(MAParser.MAParserError) as e:
         parser.scan_line("link : t@test")
-    with pytest.raises(Exception) as exc_info:
+    assert str(e.value) == ERROR_MSG + " Col 14 Line 1. Content: 'link : t@test'."
+
+    with pytest.raises(MAParser.MAParserError) as e:
         parser.scan_line("distribution : ")
+    assert str(e.value) == ERROR_MSG + " Col 16 Line 1. Content: 'distribution : '."
+
 
 #
 # scan_text_tests
@@ -117,18 +144,18 @@ def test_scan_line_empty_statements_cause_exceptions(parser):
 def test_scan_text_example_simple(parser):
     scanned_text = parser.scan_text(examples.EXAMPLE_SIMPLE)
     assert len(scanned_text) == 12
-    assert scanned_text[0][0:2] == ["MODEL_DEF", "top"]
-    assert scanned_text[1][0:2] == ["COMPONENTS", "generator@generator"]
-    assert scanned_text[2][0:2] == ["OUT", "out_port"]
-    assert scanned_text[3][0:2] == ["IN", "stop"]
-    assert scanned_text[4][0:3] == ["LINK", "stop", "stop@generator"]
-    assert scanned_text[5][0:3] == ["LINK", "out@generator", "out_port"]
-    assert scanned_text[6][0:2] == ["MODEL_DEF", "generator"]
-    assert scanned_text[7][0:3] == ["ATTR", "distribution", "normal"]
-    assert scanned_text[8][0:3] == ["ATTR", "mean", "3"]
-    assert scanned_text[9][0:3] == ["ATTR", "deviation", "1"]
-    assert scanned_text[10][0:3] == ["ATTR", "initial", "1"]
-    assert scanned_text[11][0:3] == ["ATTR", "increment", "5"]
+    assert scanned_text[0][0:2] == [TOKEN_TYPE.MODEL_DEF, "top"]
+    assert scanned_text[1][0:2] == [TOKEN_TYPE.COMPONENTS, "generator@generator"]
+    assert scanned_text[2][0:2] == [TOKEN_TYPE.OUT, "out_port"]
+    assert scanned_text[3][0:2] == [TOKEN_TYPE.IN, "stop"]
+    assert scanned_text[4][0:3] == [TOKEN_TYPE.LINK, "stop", "stop@generator"]
+    assert scanned_text[5][0:3] == [TOKEN_TYPE.LINK, "out@generator", "out_port"]
+    assert scanned_text[6][0:2] == [TOKEN_TYPE.MODEL_DEF, "generator"]
+    assert scanned_text[7][0:3] == [TOKEN_TYPE.ATTR, "distribution", "normal"]
+    assert scanned_text[8][0:3] == [TOKEN_TYPE.ATTR, "mean", "3"]
+    assert scanned_text[9][0:3] == [TOKEN_TYPE.ATTR, "deviation", "1"]
+    assert scanned_text[10][0:3] == [TOKEN_TYPE.ATTR, "initial", "1"]
+    assert scanned_text[11][0:3] == [TOKEN_TYPE.ATTR, "increment", "5"]
 
 #
 # parse_line_tests
@@ -335,6 +362,7 @@ def test_parse_line_attr_complex_(parser, context):
     assert ("deviation", ["1"]) in context[MODELS][TEST][ATTR]
     assert ("initial", ["1"]) in context[MODELS][TEST][ATTR]
 
+
 # parse_text test
 
 def test_parse_text_example_simple(parser, context):
@@ -364,6 +392,7 @@ def test_parse_text_example_simple(parser, context):
     assert ("deviation", ["1"]) in context[MODELS][GENERATOR][ATTR]
     assert ("initial", ["1"]) in context[MODELS][GENERATOR][ATTR]
     assert ("increment", ["5"]) in context[MODELS][GENERATOR][ATTR]
+
 
 def test_parse_text_example_complex(parser, context):
     context = parser.parse_text(examples.EXAMPLE_COMPLEX)
@@ -412,3 +441,39 @@ def test_parse_text_example_complex(parser, context):
     assert NETWORK_DELAY in context[MODELS].keys()
     assert context[MODELS][NETWORK_DELAY][IS_ATOMIC]
     assert ("initialDelay", ["5"]) in context[MODELS][NETWORK_DELAY][ATTR]
+
+
+def test_parse_text_example_error_no_components_def(parser, context):
+    with pytest.raises(MAParser.MAParserError, match="ERROR: Listed component 'generator' is not defined. Line 2.") as e:
+        context = parser.parse_text(examples.EXAMPLE_ERROR_NO_COMPONENTS_DEF)
+
+
+def test_parse_text_example_error_no_components_composite_def(parser, context):
+    with pytest.raises(MAParser.MAParserError, match="ERROR: Listed component 'test' is not defined. Line 2.") as e:
+        context = parser.parse_text(examples.EXAMPLE_ERROR_NO_COMPONENTS_COMPOSITE_DEF)
+
+
+def test_parse_text_example_error_no_declared_port(parser, context):
+    with pytest.raises(MAParser.MAParserError, match="ERROR: port named 'stop' is not defined for model 'top'. Line 11.") as e:
+        context = parser.parse_text(examples.EXAMPLE_ERROR_NO_DECLARED_PORT)
+
+
+def test_parse_text_example_error_atomic_with_in_port(parser, context):
+    with pytest.raises(MAParser.MAParserError, match="ERROR: Atomic model cannot have 'in' statements. Line 12.") as e:
+        context = parser.parse_text(examples.EXAMPLE_ERROR_ATOMIC_WITH_IN_PORT)
+
+
+def test_parse_text_example_error_atomic_with_out_port(parser, context):
+    with pytest.raises(MAParser.MAParserError, match="ERROR: Atomic model cannot have 'out' statements. Line 10.") as e:
+        context = parser.parse_text(examples.EXAMPLE_ERROR_ATOMIC_WITH_OUT_PORT)
+
+
+def test_parse_text_example_error_atomic_with_link(parser, context):
+    with pytest.raises(MAParser.MAParserError, match="ERROR: Atomic model cannot have 'link' statements. Line 9.") as e:
+        context = parser.parse_text(examples.EXAMPLE_ERROR_ATOMIC_WITH_LINK)
+
+
+def test_parse_text_example_example_error_missing_components(parser, context):
+    with pytest.raises(MAParser.MAParserError, match="ERROR: An error ocurred while scanning. Col 13 Line 2. Content: "
+                                                     "'components: '.") as e:
+        context = parser.parse_text(examples.EXAMPLE_ERROR_MISSING_COMPONENTS)
