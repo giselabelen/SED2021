@@ -79,7 +79,7 @@ class MAParser:
 
         value_link_own = pp.Word(_MAprintables_)
         value_link_other = pp.Word(pp.printables) + keyword_link_at + pp.Word(_MAprintables_)
-        value_link = pp.Or(value_link_own, value_link_other)
+        value_link = value_link_own ^ value_link_other
         word_link = keyword_link + keyword_assign_attribute + value_link + value_link
         word_link.setParseAction(lambda s, l, t: [MATokens.LINK, *t[2:]])
 
@@ -326,6 +326,7 @@ class MAParser:
             self.__validate_context(context)
         except MAParserError as e:
             raise MAParserError(e.msg, e.col, num_line, e.line)
+        del context["CURRENT_MODEL"]
         return context
 
     def parse_file(self, filename):

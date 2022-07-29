@@ -1,11 +1,10 @@
-from setuptools import setup
-
- setup(
+from setuptools import setup, find_packages
+setup(
    name='DEVSParser',
    version='0.1.0',
    author='Emiliano Lucero',
    author_email='eslucero2010@gmail.com',
-   packages=['DEVSParser', 'DEVSParser.test'],
+   packages=find_packages(),
    scripts=[],
    url='',
    license='LICENSE.txt',

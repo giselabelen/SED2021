@@ -1,6 +1,6 @@
-from DEVSParser.src import MAParser
 import pytest
-from . import examples
+from DEVSParser.test import examples
+from DEVSParser.src import MAParser
 
 TOKEN_TYPE = MAParser.MATokens
 
