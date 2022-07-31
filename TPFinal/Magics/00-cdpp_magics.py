@@ -1,3 +1,4 @@
+from typing import Optional
 from IPython.core.magic import (Magics, magics_class, line_magic)
 from pathlib import Path
 import subprocess
@@ -25,6 +26,11 @@ def parse_args_from_string(s : str):
 
 @magics_class
 class CDPP(Magics):
+    def get_cdpp_cwd(self) -> Optional[Path]:
+        if not self.compile_from_project:
+            return self.CDPP_SRC
+        return self.CDPP_PROJECT_SRC
+
     @line_magic
     def cdpp_init(self, line : str) -> str:
         """
@@ -70,9 +76,36 @@ class CDPP(Magics):
         """
         parameters : list[str] = line.split()
         if len(parameters) == 0:
-            return "Error: Project directory path missing"
-        self.CDPP_PROJECT_DIR : Path = self.CDPP_DIR / Path(parameters[0])
+            return "Error: Insuficient arguments."
+
+        if len(parameters) == 1:
+            self.CDPP_PROJECT_DIR : Path = self.CDPP_DIR / Path(parameters[0])
+            self.compile_from_project : bool = False
+        else:
+            self.compile_from_project : bool = parameters[0].lower() == "-c"
+            self.CDPP_PROJECT_DIR : Path = self.CDPP_DIR / Path(parameters[1])
+
+        if not self.CDPP_PROJECT_DIR.exists():
+            return f"Error: Project dir {parameters[1]} does no exists."
+
         globals()["CDPP_PATHS"]["CDPP_PROJECT_DIR"] = self.CDPP_PROJECT_DIR
+
+        if self.compile_from_project:
+            self.CDPP_PROJECT_SRC : Optional[Path] = self.CDPP_PROJECT_DIR.joinpath("src")
+
+            if not self.CDPP_PROJECT_SRC.exists():
+                return f"Error: Project src dir {str(self.CDPP_PROJECT_SRC)} does no exists."
+
+            self.CDPP_PROJECT_BIN : Optional[Path] = self.CDPP_PROJECT_SRC.joinpath("bin")
+
+            if not self.CDPP_PROJECT_BIN.exists():
+                return f"Error: Project src/bin dir {str(self.CDPP_PROJECT_BIN)} does no exists."
+        else:
+            self.CDPP_PROJECT_SRC : Optional[Path] = None
+            self.CDPP_PROJECT_BIN : Optional[Path] = None
+
+        globals()["CDPP_PATHS"]["CDPP_PROJECT_SRC"] = self.CDPP_PROJECT_SRC
+        globals()["CDPP_PATHS"]["CDPP_PROJECT_BIN"] = self.CDPP_PROJECT_BIN
         return str(self.CDPP_PROJECT_DIR)
 
     @line_magic
@@ -83,10 +116,12 @@ class CDPP(Magics):
         parameters : list[str] = line.split()
         if len(parameters) != 1:
             return "Error: Must give model file path."
+
         model_path : Path = self.CDPP_PROJECT_DIR / Path(parameters[0])
         if not model_path.exists():
             return f"Error: File {str(model_path)} does not exists."
         print(model_path.read_text())
+
         return ""
 
     @line_magic
@@ -113,7 +148,7 @@ class CDPP(Magics):
         Función magic de línea que se encarga de compilar el simulador CDPP
         """
         command : list[str] = ["make", "-j4"]
-        print(subprocess.Popen(command, cwd=self.CDPP_SRC, universal_newlines=True, shell=True, stdout=subprocess.PIPE).stdout.read())
+        print(subprocess.Popen(command, cwd=self.get_cdpp_cwd(), universal_newlines=True, shell=True, stdout=subprocess.PIPE).stdout.read())
 
     @line_magic
     def cdpp_compile_tools(self, line : str) -> None:
@@ -121,7 +156,7 @@ class CDPP(Magics):
         Función magic de línea que se encarga de compilar las herramientas auxiliares del simulador CDPP(ej: drawlog)
         """
         command : list[str] = ["make", "-j4", "tools"]
-        print(subprocess.Popen(command, cwd=self.CDPP_SRC, universal_newlines=True, shell=True, stdout=subprocess.PIPE).stdout.read())
+        print(subprocess.Popen(command, cwd=self.get_cdpp_cwd(), universal_newlines=True, shell=True, stdout=subprocess.PIPE).stdout.read())
 
     @line_magic
     def cdpp_recompile(self, line : str) -> None:
@@ -129,7 +164,7 @@ class CDPP(Magics):
         Función magic de línea que se encarga de limpiar la compilación del simulador CDPP y luego lo compila.
         """
         command : list[str] = ["make", "clean"]
-        print(subprocess.Popen(command, cwd=self.CDPP_SRC, universal_newlines=True, shell=True, stdout=subprocess.PIPE).stdout.read())
+        print(subprocess.Popen(command, cwd=self.get_cdpp_cwd(), universal_newlines=True, shell=True, stdout=subprocess.PIPE).stdout.read())
         self.cdpp_compile(line)
 
     @line_magic
@@ -160,7 +195,10 @@ class CDPP(Magics):
             if k in ["-l", "-m", "-o", "-D"]:
                 v = str(self.CDPP_PROJECT_DIR / Path(v))
 
-        program : Path = self.BASE_BIN.joinpath("cd++")
+        if not self.compile_from_project:
+            program : Path = self.BASE_BIN.joinpath("cd++")
+        else:
+            program : Path = self.CDPP_PROJECT_BIN.joinpath("cd++")
         command : list[str] = [f"{str(program)}"]
 
         for k, v in parameters.items():
