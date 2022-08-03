@@ -81,7 +81,7 @@ class CDPP(Magics):
     @magic_arguments()
     @argument("home", type=str, help="Path a la carpeta que contiene al directorio SED.")
     @line_magic
-    def cdpp_init(self, line : str) -> str:
+    def cdpp_init(self, line : str) -> dict[str, Path]:
         """
         Función magic de línea que se encarga de inicializar el entorno del simulador CDPP, carga todos los paths que se van a utilizar y crea una copia global para que se puedan acceder desde los notebooks.
         Toma como parámetro obligatorio el path a la carpeta que contiene a la carpeta SED(ej: /home/usuario/), la cual contiene el simulador CDPP.
@@ -123,7 +123,7 @@ class CDPP(Magics):
 
         self.compile_from_project : bool = False
 
-        return str(self.SED_HOME)
+        return globals()["CDPP_PATHS"]
 
     @magic_arguments()
     @argument("project", type=str, help="Path a la carpeta que contiene el proyecto sobre el cual se quiere trabajar. Debe ser relativo a la carpeta del simulador.")
@@ -147,11 +147,11 @@ class CDPP(Magics):
     @magic_arguments()
     @argument("file", type=str, help="Path al archivo a mostrar. Debe ser relativo al directorio del proyecto.")
     @line_magic
-    def cdpp_show_model(self, line : str) -> None:
+    def cdpp_show(self, line : str) -> None:
         """
         Función magic de línea que carga un archivo de texto .ma y lo muestra en la celda
         """
-        args = parse_argstring(CDPP.cdpp_show_model, line)
+        args = parse_argstring(CDPP.cdpp_show, line)
 
         model_path : Path = self.CDPP_PROJECT_DIR / Path(args.file)
         if not model_path.exists():
