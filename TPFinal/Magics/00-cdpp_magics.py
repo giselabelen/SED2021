@@ -2,10 +2,12 @@ from IPython.core.magic import (Magics, magics_class, line_magic)
 from IPython.core.magic_arguments import argument, magic_arguments, parse_argstring
 from pathlib import Path
 from urllib import request
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Callable
+import pandas as pd
 import subprocess
 import shutil
 import zipfile
+import os
 
 """
 Colección de funciones magics para facilitar el uso del simulador CDPP en Jupyter Labs.
@@ -17,14 +19,50 @@ donde {NAME} es el nombre del perfil de IPython sobre el cua lse va a trabajar, 
 
 URL_CARLETON_MODELS: str = "http://www.sce.carleton.ca/faculty/wainer/wbgraf/samples/"
 
+# definimos los nombres de las columnas en los dataframes de pandas
+TIME_COL: str = 'time'
+TIME_COL2: str = 'time2'
+PORT_COL: str = 'port'
+VALUE_COL: str = 'value'
+MESSAGE_TYPE_COL: str = 'message_type'
+MODEL_ORIGIN_COL: str = 'model_origin'
+MODEL_DEST_COL: str = 'model_dest'
+
+
+def parse_value(value: str):
+    """
+    Parsea un string y devuelve un valor o una lista de valores
+    """
+    is_list = value.strip().startswith("[") and value.strip().endswith("]")
+    if is_list:
+        return tuple(float(num) for num in value.replace('[', '').replace(']', '').split(', '))
+    return float(value)
+
+
+def time_to_secs(time):
+    """
+    Parsea un string con tiempos en el formato utilizado por el simulador
+    """
+    h, m, s, ms, r = time.split(':')
+    return float(h) * 60 * 60. + float(m) * 60. + float(s) + float(ms) / 1000. + float(r) / 1000.
+
+
+df_converters: Dict[str, Callable] = {
+    VALUE_COL: parse_value,
+    TIME_COL: time_to_secs
+}
+
 LINE_MAGICS: List[str] = ["lscdpp", "cdpp_run", "drawlog_run", "cdpp_help", "drawlog_help", "cdpp_compile",
                           "cdpp_compile_tools", "cdpp_recompile", "cdpp_unzip", "cdpp_download",
                           "cdpp_download_carleton", "cdpp_copy_to_project", "cdpp_show_model", "cdpp_set_project",
-                          "cdpp_init"]
+                          "cdpp_init", "parse_log", "parse_out_ev"]
 CELL_MAGICS: List[str] = []
 
 
 def download_file(url: str, download_file_path: Path):
+    """
+    Descarga el archivo indicado por la url al destino indicado por download_file_path
+    """
     try:
         request.urlretrieve(url, download_file_path)
     except Exception as e:
@@ -46,6 +84,9 @@ def parse_args_from_string(s: str):
 
 @magics_class
 class CDPP(Magics):
+    """
+    Clase contenedora de las funciones magics creadas para simplificar el uso del simulador CDPP
+    """
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.compile_from_project: bool = False
@@ -64,11 +105,18 @@ class CDPP(Magics):
         self.DRAWLOG_BIN: Path = Path()
 
     def get_cdpp_cwd(self) -> Optional[Path]:
+        """
+        Devuelve el directorio de trabajo actual para lo que es compilación del simulador.
+        Es necesario para distinguir la compilación del simulador canónico del modificado en un proyecto.
+        """
         if not self.compile_from_project:
             return self.CDPP_SRC
         return self.CDPP_PROJECT_SRC
 
     def set_up_project_compile(self, parameters: List[str]):
+        """
+        Establece el entorno del proyecto para que se compile y utilice una version del simulador propia del proyecto
+        """
         if len(parameters) == 1:
             self.compile_from_project = False
             self.CDPP_PROJECT_DIR = self.CDPP_DIR.joinpath(Path(parameters[0]))
@@ -342,7 +390,73 @@ class CDPP(Magics):
 
     @line_magic
     def lscdpp(self, _: str) -> Dict[str, List[str]]:
+        """
+        Función magic que lista todos los magics definidos que simplifican el uso del simulador CDPP
+        """
         return {"line": LINE_MAGICS, "cell": CELL_MAGICS}
+
+    @magic_arguments()
+    @argument("path_to_out_ev", type=str,
+              help="Path al archivo de salida .out generado por una ejecución del simulador.")
+    @line_magic
+    def parse_out_ev(self, line: str):
+        """
+        Función magic de línea que lee y parsea un archivo .out o .ev generado por una ejecución del simulador CDPP
+        y devuelve un Dataframe de pandas con la información correspondiente.
+        """
+        args = parse_argstring(CDPP.parse_out_ev, line)
+        path = Path(args.path_to_out_ev)
+        if self.CDPP_PROJECT_DIR is not None:
+            path = self.CDPP_PROJECT_DIR / Path(args.path_to_out_ev)
+        if not path.exists():
+            print(f"Error: File {line} does not exists.")
+            return
+        df = pd.read_csv(path,
+                         delimiter=r'(?<!,)\s+',
+                         engine='python',  # C engine doesnt work for regex
+                         converters=df_converters,
+                         names=[TIME_COL, PORT_COL, VALUE_COL]
+                         )
+        return df
+
+    @magic_arguments()
+    @argument("path_to_log_file", type=str,
+              help="Path al archivo de salida .log generado por una ejecución del simulador.")
+    @line_magic
+    def parse_log(self, line: str):
+        """
+        Función magic de línea que lee y parsea un archivo .log generado por una ejecución del simulador CDPP
+        y devuelve un Dataframe de pandas con la información correspondiente.
+        """
+        args = parse_argstring(CDPP.parse_log, line)
+        path = Path(args.path_to_log_file)
+        if self.CDPP_PROJECT_DIR is not None:
+            path = self.CDPP_PROJECT_DIR / Path(args.path_to_log_file)
+        if not path.exists():
+            print(f"Error: File {line} does not exists.")
+            return
+
+        log_file_per_component = {}
+        parsed_logs = {}
+
+        # separo cada log file
+        with open(path, 'r') as main_log_file:
+            main_log_file.readline()  # Ignore first line
+            log_dir = os.path.dirname(path)
+            for line in main_log_file:
+                name, path = line.strip().split(' : ')
+                log_file_per_component[name] = (path if os.path.isabs(path) else
+                                                log_dir + '/' + path.split('/')[-1])
+
+        # parseo cada log file
+        for log_name, filename in log_file_per_component.items():
+            parsed_logs[log_name] = pd.read_csv(filename,
+                                                delimiter=r' /\s+',
+                                                engine='python',  # C engine doesnt work for regex
+                                                names=['1', '2', '3', '4', '5', '6', '7', '8']
+                                                # nombre genérico pues varía el contenido de la fila según tipo de mensaje
+                                                )
+        return parsed_logs
 
 
 if __name__ == '__main__':
