@@ -327,9 +327,9 @@ class CDPP(Magics):
         """
         Función magic de línea que muestra la ayuda del programa cd++
         """
-        program: Path = self.BASE_BIN.joinpath("cd++")
+        program: Path = self.get_cdpp_cwd().joinpath("bin").joinpath("cd++")
         command: List[str] = [f"{str(program)}", "-h"]
-        print(subprocess.Popen(command, cwd=self.CDPP_PROJECT_DIR, universal_newlines=True,
+        print(subprocess.Popen(command, cwd=self.get_cdpp_cwd(), universal_newlines=True,
                                stdout=subprocess.PIPE).stdout.read())
 
     @line_magic
