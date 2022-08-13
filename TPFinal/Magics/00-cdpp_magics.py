@@ -54,7 +54,7 @@ df_converters: Dict[str, Callable] = {
 
 LINE_MAGICS: List[str] = ["lscdpp", "cdpp_run", "drawlog_run", "cdpp_help", "drawlog_help", "cdpp_compile",
                           "cdpp_compile_tools", "cdpp_recompile", "cdpp_unzip", "cdpp_download",
-                          "cdpp_download_carleton", "cdpp_copy_to_project", "cdpp_show_model", "cdpp_set_project",
+                          "cdpp_download_carleton", "cdpp_copy_to_project", "cdpp_show", "cdpp_set_project",
                           "cdpp_init", "parse_log", "parse_out_ev"]
 CELL_MAGICS: List[str] = []
 
@@ -216,7 +216,7 @@ class CDPP(Magics):
     @line_magic
     def cdpp_show(self, line: str) -> None:
         """
-        Función magic de línea que carga un archivo de texto .ma y lo muestra en la celda
+        Función magic de línea que carga un archivo de texto y lo muestra en la celda
         """
         args = parse_argstring(CDPP.cdpp_show, line)
 
