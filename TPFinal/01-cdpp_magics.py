@@ -259,18 +259,17 @@ class CDPP(Magics):
 
         flags = []
         if src.is_dir():
-            src = str(src) + os.sep
+            src = str(src) + os.sep + "."
             flags.append("-r")
         else:
             src = str(src)
 
-        command = "cp {} {} {}".format(*flags, src, dst)
+        command = ["cp", *flags, src, dst]
         print(f"Copiando contenidos de {src} a {dst}...")
         try:
-            print(os.system(command))
-            # shutil.copytree(src_path, self.CDPP_PROJECT_DIR, dirs_exist_ok=True, copy_function=shutil.copy)
+            subprocess.run(command, check=True)
             print("Listo!")
-        except Exception as e:
+        except subprocess.CalledProcessError as e:
             print(f"Error: Directory copy failed. {str(e)}")
 
     @magic_arguments()
@@ -461,9 +460,9 @@ class CDPP(Magics):
         y devuelve un Dataframe de pandas con la información correspondiente.
         """
         args = parse_argstring(CDPP.parse_log, line)
-        path = Path(args.path_to_log_file)
+        path = Path(args.path_log_file)
         if self.CDPP_PROJECT_DIR is not None:
-            path = self.CDPP_PROJECT_DIR / Path(args.path_to_log_file)
+            path = self.CDPP_PROJECT_DIR / Path(args.path_log_file)
         if not path.exists():
             print(f"Error: File {line} does not exists.")
             return
