@@ -3,7 +3,7 @@ from IPython.core.magic_arguments import argument, magic_arguments, parse_argstr
 from pathlib import Path
 from urllib import request
 from typing import Dict, List, Optional, Callable
-import pandas as pd
+import pandas
 import subprocess
 import shutil
 import zipfile
@@ -20,37 +20,37 @@ donde {NAME} es el nombre del perfil de IPython sobre el cua lse va a trabajar, 
 URL_CARLETON_MODELS: str = "http://www.sce.carleton.ca/faculty/wainer/wbgraf/samples/"
 
 # definimos los nombres de las columnas en los dataframes de pandas
-TIME_COL: str = 'time'
-TIME_COL2: str = 'time2'
-PORT_COL: str = 'port'
-VALUE_COL: str = 'value'
-MESSAGE_TYPE_COL: str = 'message_type'
-MODEL_ORIGIN_COL: str = 'model_origin'
-MODEL_DEST_COL: str = 'model_dest'
+# TIME_COL: str = 'time'
+# TIME_COL2: str = 'time2'
+# PORT_COL: str = 'port'
+# VALUE_COL: str = 'value'
+# MESSAGE_TYPE_COL: str = 'message_type'
+# MODEL_ORIGIN_COL: str = 'model_origin'
+# MODEL_DEST_COL: str = 'model_dest'
 
 
-def parse_value(value: str):
-    """
-    Parsea un string y devuelve un valor o una lista de valores
-    """
-    is_list = value.strip().startswith("[") and value.strip().endswith("]")
-    if is_list:
-        return tuple(float(num) for num in value.replace('[', '').replace(']', '').split(', '))
-    return float(value)
-
-
-def time_to_secs(time):
-    """
-    Parsea un string con tiempos en el formato utilizado por el simulador
-    """
-    h, m, s, ms, r = time.split(':')
-    return float(h) * 60 * 60. + float(m) * 60. + float(s) + float(ms) / 1000. + float(r) / 1000.
-
-
-df_converters: Dict[str, Callable] = {
-    VALUE_COL: parse_value,
-    TIME_COL: time_to_secs
-}
+# def parse_value(value: str):
+#     """
+#     Parsea un string y devuelve un valor o una lista de valores
+#     """
+#     is_list = value.strip().startswith("[") and value.strip().endswith("]")
+#     if is_list:
+#         return tuple(float(num) for num in value.replace('[', '').replace(']', '').split(', '))
+#     return float(value)
+#
+#
+# def time_to_secs(time):
+#     """
+#     Parsea un string con tiempos en el formato utilizado por el simulador
+#     """
+#     h, m, s, ms, r = time.split(':')
+#     return float(h) * 60 * 60. + float(m) * 60. + float(s) + float(ms) / 1000. + float(r) / 1000.
+#
+#
+# df_converters: Dict[str, Callable] = {
+#     VALUE_COL: parse_value,
+#     TIME_COL: time_to_secs
+# }
 
 LINE_MAGICS: List[str] = ["lscdpp", "cdpp_run", "drawlog_run", "cdpp_help", "drawlog_help", "cdpp_compile",
                           "cdpp_compile_tools", "cdpp_recompile", "cdpp_unzip", "cdpp_download",
@@ -125,7 +125,12 @@ class CDPP(Magics):
             self.CDPP_PROJECT_DIR = self.CDPP_DIR.joinpath(Path(parameters[1]))
 
         if not self.CDPP_PROJECT_DIR.exists():
-            return f"Error: Project dir {str(self.CDPP_PROJECT_DIR)} does no exists."
+            print(f"Error: Project dir {str(self.CDPP_PROJECT_DIR)} does not exists.")
+            return
+
+        if not self.CDPP_PROJECT_DIR.is_relative_to(self.SED_HOME):
+            print("Error: Project directory must be relative to SED folder")
+            return
 
         globals()["CDPP_PATHS"]["CDPP_PROJECT_DIR"] = self.CDPP_PROJECT_DIR
 
@@ -133,12 +138,14 @@ class CDPP(Magics):
             self.CDPP_PROJECT_SRC = self.CDPP_PROJECT_DIR.joinpath("src")
 
             if not self.CDPP_PROJECT_SRC.exists():
-                return f"Error: Project src dir {str(self.CDPP_PROJECT_SRC)} does no exists."
+                print(f"Error: Project src dir {str(self.CDPP_PROJECT_SRC)} does not exists.")
+                return
 
             self.CDPP_PROJECT_BIN = self.CDPP_PROJECT_SRC.joinpath("bin")
 
             if not self.CDPP_PROJECT_BIN.exists():
-                return f"Error: Project src/bin dir {str(self.CDPP_PROJECT_BIN)} does no exists."
+                print(f"Error: Project src/bin dir {str(self.CDPP_PROJECT_BIN)} does not exists.")
+                return
         else:
             self.CDPP_PROJECT_SRC = None
             self.CDPP_PROJECT_BIN = None
@@ -149,7 +156,7 @@ class CDPP(Magics):
     @magic_arguments()
     @argument("home", type=str, help="Path a la carpeta que contiene al directorio SED.")
     @line_magic
-    def cdpp_init(self, line: str) -> Dict[str, Path]:
+    def cdpp_init(self, line: str) -> Optional[Dict[str, Path]]:
         """
         Función magic de línea que se encarga de inicializar el entorno del simulador CDPP, carga todos los paths que se
          van a utilizar y crea una copia global para que se puedan acceder desde los notebooks.
@@ -160,12 +167,18 @@ class CDPP(Magics):
 
         home_path: Path = Path(args.home)
         if not home_path.exists():
-            print(f"Error: Folder path does not exists.")
+            print(f"Error: Folder path {home_path} does not exists.")
+            return
         self.SED_HOME = home_path.joinpath('SED')
+        if not self.SED_HOME.exists():
+            print(f"Error: {home_path} does not contain folder named SED.")
 
         # Directorio base donde está instalado el simulador
 
         self.CDPP_DIR = self.SED_HOME.joinpath('CDPP_ExtendedStates-codename-Santi')
+        if not self.CDPP_DIR.exists():
+            print(f"Error: {home_path} does not contain folder named CDPP_ExtendedStates-codename-Santi.")
+            return
 
         self.CDPP_SRC = self.CDPP_DIR.joinpath('src')
         self.CDPP_EXAMPLES = self.CDPP_DIR.joinpath('examples')
@@ -219,35 +232,38 @@ class CDPP(Magics):
         Función magic de línea que carga un archivo de texto y lo muestra en la celda
         """
         args = parse_argstring(CDPP.cdpp_show, line)
+        file_path = Path(args.file)
 
-        model_path: Path = self.CDPP_PROJECT_DIR / Path(args.file)
-        if not model_path.exists():
-            print(f"Error: File {str(model_path)} does not exists.")
-        print(model_path.read_text())
+        if not file_path.is_relative_to(self.CDPP_PROJECT_DIR) and (self.CDPP_PROJECT_DIR / file_path).exists():
+            file_path = self.CDPP_PROJECT_DIR / file_path
+        if not file_path.exists():
+            print(f"Error: File {str(file_path)} does not exists.")
+        print(file_path.read_text())
 
     @magic_arguments()
     @argument("folder_path", type=str, help="Path a la carpeta a copiar en el directorio del proyecto actual.")
     @line_magic
-    def cdpp_copy_to_project(self, line: str) -> str:
+    def cdpp_copy_to_project(self, line: str) -> None:
         """
         Función magic de línea que copia una carpeta y su contenido a la carpeta principal del proyecto actual.
         """
         args = parse_argstring(CDPP.cdpp_copy_to_project, line)
         src_path: Path = Path(args.folder_path)
         if not src_path.exists():
-            return "Error: Path does not exists."
+            print("Error: Path does not exists.")
+            return
         print(f"Copiando contenidos de {src_path} a {self.CDPP_PROJECT_DIR}...")
         try:
             shutil.copytree(src_path, self.CDPP_PROJECT_DIR, dirs_exist_ok=True, copy_function=shutil.copy)
-            return "Listo!"
+            print("Listo!")
         except Exception as e:
-            return f"Error: Directory copy failed. {str(e)}"
+            print(f"Error: Directory copy failed. {str(e)}")
 
     @magic_arguments()
     @argument("url", type=str, help="URL del recurso a descargar.")
     @argument("download_path", type=str, help="Ubicación y nombre donde se guarda el archivo descargado.")
     @line_magic
-    def cdpp_download(self, line: str) -> str:
+    def cdpp_download(self, line: str) -> None:
         """
         Función magic que descarga el archivo indicado por la url parámetro y lo guarda con el nombre indicado
         """
@@ -256,30 +272,30 @@ class CDPP(Magics):
         out_path = Path(args.download_path)
         download_file(args.url, out_path)
 
-        return f"Done: {args.url}, {out_path}"
+        print(f"Done: {args.url}, {out_path}")
 
     @magic_arguments()
     @argument("download_path", type=str,
               help="Ubicación y nombre donde se guarda el archivo descargado." 
                    "Es relativo a la carpeta del proyecto actual.")
     @line_magic
-    def cdpp_download_carleton(self, line: str) -> str:
+    def cdpp_download_carleton(self, line: str) -> None:
         """
         Función magic que descarga el archivo indicado por la url pasada por parámetro y lo guarda en el path relativo
         a la carpeta del proyecto indicado
         """
         args = parse_argstring(CDPP.cdpp_download_carleton, line)
-
-        out_path: Path = self.CDPP_PROJECT_DIR.joinpath(Path(args.download_path))
+        path: Path = Path(args.download_path)
+        out_path: Path = self.CDPP_PROJECT_DIR.joinpath(path)
         download_file(URL_CARLETON_MODELS + args.download_path, out_path)
 
-        return f"Done: {URL_CARLETON_MODELS + args.download_path}, {str(out_path)}"
+        print(f"Done: {URL_CARLETON_MODELS + args.download_path}, {str(out_path)}")
 
     @magic_arguments()
     @argument("path", type=str,
               help="Path al archivo comprimido que se quiere descomprimir, relativo a la carpeta del proyecto actual.")
     @line_magic
-    def cdpp_unzip(self, line: str) -> str:
+    def cdpp_unzip(self, line: str) -> None:
         """
         Función magic que descomprime el archivo indicado por el path, relativo a la carpeta del proyecto
         """
@@ -292,7 +308,7 @@ class CDPP(Magics):
         with zipfile.ZipFile(f"{str(file_path)}", 'r') as zip_ref:
             zip_ref.extractall(self.CDPP_PROJECT_DIR)
 
-        return f"Done extracting {line}"
+        print(f"Done extracting {line}")
 
     @line_magic
     def cdpp_compile(self, _: str) -> None:
@@ -327,6 +343,9 @@ class CDPP(Magics):
         """
         Función magic de línea que muestra la ayuda del programa cd++
         """
+        if self.SED_HOME == Path():
+            print("Error: Entorno CDPP no inicializado, use el magic %cdpp_init primero y vuelva a intentarlo.")
+            return
         program: Path = self.get_cdpp_cwd().joinpath("bin").joinpath("cd++")
         command: List[str] = [f"{str(program)}", "-h"]
         print(subprocess.Popen(command, cwd=self.get_cdpp_cwd(), universal_newlines=True,
@@ -337,6 +356,9 @@ class CDPP(Magics):
         """
         Función magic de línea que muestra la ayuda del programa drawlog
         """
+        if self.SED_HOME == Path():
+            print("Error: Entorno CDPP no inicializado, use el magic %cdpp_init primero y vuelva a intentarlo.")
+            return
         program: Path = self.BASE_BIN.joinpath("drawlog")
         command: List[str] = [f"{str(program)}", "-h"]
         print(subprocess.Popen(command, cwd=self.get_cdpp_cwd(), universal_newlines=True,
@@ -399,7 +421,7 @@ class CDPP(Magics):
     @argument("path_to_out_ev", type=str,
               help="Path al archivo de salida .out generado por una ejecución del simulador.")
     @line_magic
-    def parse_out_ev(self, line: str):
+    def parse_out_ev(self, line: str) -> Optional[pandas.DataFrame]:
         """
         Función magic de línea que lee y parsea un archivo .out o .ev generado por una ejecución del simulador CDPP
         y devuelve un Dataframe de pandas con la información correspondiente.
@@ -411,19 +433,14 @@ class CDPP(Magics):
         if not path.exists():
             print(f"Error: File {line} does not exists.")
             return
-        df = pd.read_csv(path,
-                         delimiter=r'(?<!,)\s+',
-                         engine='python',  # C engine doesnt work for regex
-                         converters=df_converters,
-                         names=[TIME_COL, PORT_COL, VALUE_COL]
-                         )
+        df = parser_out_ev(path)
         return df
 
     @magic_arguments()
-    @argument("path_to_log_file", type=str,
+    @argument("path_log_file", type=str,
               help="Path al archivo de salida .log generado por una ejecución del simulador.")
     @line_magic
-    def parse_log(self, line: str):
+    def parse_log(self, line: str) -> Optional[Dict[str, pandas.DataFrame]]:
         """
         Función magic de línea que lee y parsea un archivo .log generado por una ejecución del simulador CDPP
         y devuelve un Dataframe de pandas con la información correspondiente.
@@ -435,28 +452,7 @@ class CDPP(Magics):
         if not path.exists():
             print(f"Error: File {line} does not exists.")
             return
-
-        log_file_per_component = {}
-        parsed_logs = {}
-
-        # separo cada log file
-        with open(path, 'r') as main_log_file:
-            main_log_file.readline()  # Ignore first line
-            log_dir = os.path.dirname(path)
-            for line in main_log_file:
-                name, path = line.strip().split(' : ')
-                log_file_per_component[name] = (path if os.path.isabs(path) else
-                                                log_dir + '/' + path.split('/')[-1])
-
-        # parseo cada log file
-        for log_name, filename in log_file_per_component.items():
-            parsed_logs[log_name] = pd.read_csv(filename,
-                                                delimiter=r' /\s+',
-                                                engine='python',  # C engine doesnt work for regex
-                                                names=['1', '2', '3', '4', '5', '6', '7', '8']
-                                                # nombre genérico pues varía el contenido de la fila según tipo de mensaje
-                                                )
-        return parsed_logs
+        return parser_log(path)
 
 
 if __name__ == '__main__':
