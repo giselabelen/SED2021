@@ -66,6 +66,22 @@ def parse_args_from_string(s: str) -> Dict[str, str]:
             args[x] = y
     return args
 
+# Sacado de
+# https://stackoverflow.com/questions/3812849/how-to-check-whether-a-directory-is-a-sub-directory-of-another-directory,
+# reemplaza a is_relative_to de pathlib.Path
+
+
+def path_is_parent(parent_path: Path, child_path: Path):
+    # Smooth out relative path names, note: if you are concerned about symbolic links,
+    # you should use os.path.realpath too
+    parent = os.path.abspath(str(parent_path))
+    child = os.path.abspath(str(child_path))
+
+    # Compare the common path of the parent and child path with the common path of just the parent path.
+    # Using the commonpath method on just the parent path will regularise the path name in the same way
+    # as the comparison that deals with both paths, removing any trailing path separator
+    return os.path.commonpath([parent]) == os.path.commonpath([parent, child])
+
 
 @magics_class
 class CDPP(Magics):
@@ -116,12 +132,10 @@ class CDPP(Magics):
             self.CDPP_PROJECT_DIR = self.CDPP_DIR.joinpath(Path(parameters[1]))
 
         if not self.CDPP_PROJECT_DIR.exists():
-            print(f"Error: Project dir {str(self.CDPP_PROJECT_DIR)} does not exists.")
-            return
+            raise NotADirectoryError(f"Error: Project dir {str(self.CDPP_PROJECT_DIR)} does not exists.")
 
-        if not self.CDPP_PROJECT_DIR.is_relative_to(self.SED_HOME):
-            print("Error: Project directory must be relative to SED folder")
-            return
+        if not path_is_parent(self.SED_HOME, self.CDPP_PROJECT_DIR):
+            raise NotADirectoryError("Error: Project directory must be relative to SED folder")
 
         globals()["CDPP_PATHS"]["CDPP_PROJECT_DIR"] = self.CDPP_PROJECT_DIR
 
@@ -129,14 +143,12 @@ class CDPP(Magics):
             self.CDPP_PROJECT_SRC = self.CDPP_PROJECT_DIR.joinpath("src")
 
             if not self.CDPP_PROJECT_SRC.exists():
-                print(f"Error: Project src dir {str(self.CDPP_PROJECT_SRC)} does not exists.")
-                return
+                raise NotADirectoryError(f"Error: Project src dir {str(self.CDPP_PROJECT_SRC)} does not exists.")
 
             self.CDPP_PROJECT_BIN = self.CDPP_PROJECT_SRC.joinpath("bin")
 
             if not self.CDPP_PROJECT_BIN.exists():
-                print(f"Error: Project src/bin dir {str(self.CDPP_PROJECT_BIN)} does not exists.")
-                return
+                raise NotADirectoryError(f"Error: Project src/bin dir {str(self.CDPP_PROJECT_BIN)} does not exists.")
         else:
             self.CDPP_PROJECT_SRC = None
             self.CDPP_PROJECT_BIN = None
@@ -158,18 +170,17 @@ class CDPP(Magics):
 
         home_path: Path = Path(args.home)
         if not home_path.exists():
-            print(f"Error: Folder path {home_path} does not exists.")
-            return
+            raise NotADirectoryError(f"Error: Folder path {home_path} does not exists.")
         self.SED_HOME = home_path.joinpath('SED')
         if not self.SED_HOME.exists():
-            print(f"Error: {home_path} does not contain folder named SED.")
+            raise NotADirectoryError(f"Error: {home_path} does not contain folder named SED.")
 
         # Directorio base donde está instalado el simulador
 
         self.CDPP_DIR = self.SED_HOME.joinpath('CDPP_ExtendedStates-codename-Santi')
         if not self.CDPP_DIR.exists():
-            print(f"Error: {home_path} does not contain folder named CDPP_ExtendedStates-codename-Santi.")
-            return
+            raise NotADirectoryError(f"Error: {home_path} does not contain folder named"
+                                     "CDPP_ExtendedStates-codename-Santi.")
 
         self.CDPP_SRC = self.CDPP_DIR.joinpath('src')
         self.CDPP_EXAMPLES = self.CDPP_DIR.joinpath('examples')
@@ -225,7 +236,7 @@ class CDPP(Magics):
         args = parse_argstring(CDPP.cdpp_show, line)
         file_path = Path(args.file)
 
-        if not file_path.is_relative_to(self.CDPP_PROJECT_DIR) and (self.CDPP_PROJECT_DIR / file_path).exists():
+        if not path_is_parent(self.CDPP_PROJECT_DIR, file_path) and (self.CDPP_PROJECT_DIR / file_path).exists():
             file_path = self.CDPP_PROJECT_DIR / file_path
         if not file_path.exists():
             print(f"Error: File {str(file_path)} does not exists.")
@@ -241,11 +252,23 @@ class CDPP(Magics):
         args = parse_argstring(CDPP.cdpp_copy_to_project, line)
         src_path: Path = Path(args.folder_path)
         if not src_path.exists():
-            print("Error: Path does not exists.")
+            print(f"Error: Path {str(src_path)} does not exists.")
             return
-        print(f"Copiando contenidos de {src_path} a {self.CDPP_PROJECT_DIR}...")
+        src = src_path.absolute()
+        dst = str(self.CDPP_PROJECT_DIR.absolute())
+
+        flags = []
+        if src.is_dir():
+            src = str(src) + os.sep
+            flags.append("-r")
+        else:
+            src = str(src)
+
+        command = "cp {} {} {}".format(*flags, src, dst)
+        print(f"Copiando contenidos de {src} a {dst}...")
         try:
-            shutil.copytree(src_path, self.CDPP_PROJECT_DIR, dirs_exist_ok=True, copy_function=shutil.copy)
+            print(os.system(command))
+            # shutil.copytree(src_path, self.CDPP_PROJECT_DIR, dirs_exist_ok=True, copy_function=shutil.copy)
             print("Listo!")
         except Exception as e:
             print(f"Error: Directory copy failed. {str(e)}")
@@ -398,6 +421,7 @@ class CDPP(Magics):
             command.append(k)
             command.append(v)
 
+        print("Ejecutando {}...".format(*command))
         print(subprocess.Popen(command, cwd=self.CDPP_PROJECT_DIR, universal_newlines=True,
                                stdout=subprocess.PIPE).stdout.read())
 
