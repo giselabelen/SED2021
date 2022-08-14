@@ -19,38 +19,6 @@ donde {NAME} es el nombre del perfil de IPython sobre el cua lse va a trabajar, 
 
 URL_CARLETON_MODELS: str = "http://www.sce.carleton.ca/faculty/wainer/wbgraf/samples/"
 
-# definimos los nombres de las columnas en los dataframes de pandas
-# TIME_COL: str = 'time'
-# TIME_COL2: str = 'time2'
-# PORT_COL: str = 'port'
-# VALUE_COL: str = 'value'
-# MESSAGE_TYPE_COL: str = 'message_type'
-# MODEL_ORIGIN_COL: str = 'model_origin'
-# MODEL_DEST_COL: str = 'model_dest'
-
-
-# def parse_value(value: str):
-#     """
-#     Parsea un string y devuelve un valor o una lista de valores
-#     """
-#     is_list = value.strip().startswith("[") and value.strip().endswith("]")
-#     if is_list:
-#         return tuple(float(num) for num in value.replace('[', '').replace(']', '').split(', '))
-#     return float(value)
-#
-#
-# def time_to_secs(time):
-#     """
-#     Parsea un string con tiempos en el formato utilizado por el simulador
-#     """
-#     h, m, s, ms, r = time.split(':')
-#     return float(h) * 60 * 60. + float(m) * 60. + float(s) + float(ms) / 1000. + float(r) / 1000.
-#
-#
-# df_converters: Dict[str, Callable] = {
-#     VALUE_COL: parse_value,
-#     TIME_COL: time_to_secs
-# }
 
 LINE_MAGICS: List[str] = ["lscdpp", "cdpp_run", "drawlog_run", "cdpp_help", "drawlog_help", "cdpp_compile",
                           "cdpp_compile_tools", "cdpp_recompile", "cdpp_unzip", "cdpp_download",
@@ -62,6 +30,13 @@ CELL_MAGICS: List[str] = []
 def download_file(url: str, download_file_path: Path):
     """
     Descarga el archivo indicado por la url al destino indicado por download_file_path
+
+    Parameters
+    ----------
+    url: str
+        String que contiene la url del archivo a descargar.
+    download_file_path: Path
+        Path indicando donde se va a guardar el archivo descargado
     """
     try:
         request.urlretrieve(url, download_file_path)
@@ -69,10 +44,20 @@ def download_file(url: str, download_file_path: Path):
         print(f"Error: Failed to download file {e}")
 
 
-def parse_args_from_string(s: str):
+def parse_args_from_string(s: str) -> Dict[str, str]:
     """
     Función que parsea un string como si fueran argumentos de línea de comandos y devuelve un diccionario
-    @example Dado el string '-m asd -l asd' devuelve el diccionario {"-m": "asd", "-l": "asd"}.
+
+    Parameters
+    ----------
+    s: str
+        Un string que represente parámetros pasados por línea de comandos. Por ejemplo: '-m palabra1 -l palabra2'
+
+    Returns
+    -------
+    Dict[str, str]
+        Un diccionario de string a string, donde las claves son las subcadenas de la entrada de la forma '-@' donde
+        @ puede ser cualquier letra, y el valor de cada clave es la subcadena siguiente.
     """
     raw_args: List[str] = s.split()
     args: Dict[str, str] = {}
@@ -115,7 +100,13 @@ class CDPP(Magics):
 
     def set_up_project_compile(self, parameters: List[str]):
         """
-        Establece el entorno del proyecto para que se compile y utilice una version del simulador propia del proyecto
+        Establece el entorno del proyecto para que se compile y utilice una version del simulador propia del proyecto.
+        Si en parameters se pasa el valor '-c', indica que se va a compilar una versión del simulador local al proyecto.
+
+        Parameters
+        ----------
+        parameters: List[str]
+            Lista de strings que representan flags sobre cómo establecer el proyecto.
         """
         if len(parameters) == 1:
             self.compile_from_project = False

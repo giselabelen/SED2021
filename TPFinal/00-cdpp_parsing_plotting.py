@@ -1,28 +1,23 @@
-# estoy ejecutando esto como %run 00-cdpp_parsing_plotting.py al principio del notebook
-# este archivo debe estar en el mismo directorio que el notebook en cuestion
-# falta probar de colocarlo en otro lado y usar %run /path/to/00-cdpp_parsing_plotting.py
-
-import numpy as np
 import pandas
 import pandas as pd
 import matplotlib.pyplot as plt
 import os
-from typing import Dict, Optional, List
+from typing import Dict, Optional, List, Callable, Union, Tuple
 
 # definimos los nombres de las columnas en los dataframes de pandas
-TIME_COL = 'time'
-TIME_COL2 = 'time2'
-PORT_COL = 'port'
-VALUE_COL = 'value'
-MESSAGE_TYPE_COL = 'message_type'
-MODEL_ORIGIN_COL = 'model_origin'
-MODEL_DEST_COL = 'model_dest'
+TIME_COL: str = 'time'
+TIME_COL2: str = 'time2'
+PORT_COL: str = 'port'
+VALUE_COL: str = 'value'
+MESSAGE_TYPE_COL: str = 'message_type'
+MODEL_ORIGIN_COL: str = 'model_origin'
+MODEL_DEST_COL: str = 'model_dest'
 
 
 # conversion de valor a float o tupla
-def parse_value(value: str):
+def parse_value(value: str) -> Union[float, Tuple[float]]:
     """
-    Parsea un string y devuelve un valor o una lista de valores
+    Parsea un string y devuelve un float o una lista de floats
     """
     is_list = value.strip().startswith("[") and value.strip().endswith("]")
     if is_list:
@@ -30,7 +25,7 @@ def parse_value(value: str):
     return float(value)
 
 
-def time_to_secs(time):
+def time_to_secs(time: str) -> float:
     """
     Parsea un string con tiempos en el formato utilizado por el simulador y lo convierte a segundos.
     """
@@ -39,7 +34,7 @@ def time_to_secs(time):
 
 
 # dict para convertir valores de estas columnas al parsear
-df_converters = {
+df_converters: Dict[str, Callable] = {
     VALUE_COL: parse_value,
     TIME_COL: time_to_secs
 }
@@ -49,13 +44,15 @@ def parser_out_ev(path_to_out_ev: str) -> pandas.DataFrame:
     """
     Método para parsear archivos .out y .ev.
 
-    Parámetros
+    Parameters
     ----------
     path_to_out_ev : str
         String que indica el path donde encontrar un archivo .out o un archivo .ev.
-    Devuelve
+
+    Returns
     --------
-    Un pandas.DataFrame que contiene la información del archivo de forma tabulada.
+    pandas.DataFrame
+        Un pandas.DataFrame que contiene la información del archivo de forma tabulada.
     """
     df = pd.read_csv(path_to_out_ev,
                      delimiter=r'(?<!,)\s+',
@@ -70,16 +67,18 @@ def parser_log(path_to_log_file: str) -> Optional[Dict[str, pd.DataFrame]]:
     """
     Método para parsear archivos .log.
 
-    Parámetros
+    Parameters
     ----------
-    path_to_log : str
+    path_to_log_file : str
         String que indica el path donde encontrar un archivo .log principal y todos los archivos de log a los que este
         referencie.
-    Devuelve
+
+    Returns
     --------
-    Si no había información en los archivos .log, devuelve None
-    Caso contrario, un diccionario de strings a pandas.DataFrame, donde las claves son los nombres de los archivos
-     de log y los valores son la información que contiene dicho log en forma tabulada
+    Optional[Dict[str, pd.DataFrame]]
+        Si no había información en los archivos .log, devuelve None.
+        Caso contrario, un diccionario de strings a DataFrame de pandas, donde las claves son los nombres de los
+        archivos de log y los valores son la información que contiene dicho log en forma tabulada.
     """
 
     log_file_per_component = {}
@@ -100,7 +99,7 @@ def parser_log(path_to_log_file: str) -> Optional[Dict[str, pd.DataFrame]]:
                                            delimiter=r' /\s+',
                                            engine='python',  # C engine doesnt work for regex
                                            names=['1', '2', '3', '4', '5', '6', '7', '8']
-                                           # nombre generico pues varia el contenido de la fila segun tipo de mensaje
+                                           # nombre generico pues varía el contenido de la fila segun tipo de mensaje
                                            )
     return parsed_logs
 
@@ -110,13 +109,18 @@ def filter_and_name(df: pandas.DataFrame, tipo: str) -> pandas.Series:
     Método para filtrar dataframes de logs según tipo de mensaje
     Se renombran las columnas según tipo de mensaje.
 
-    Parámetros
+    Parameters
     ----------
     df: pandas.DataFrame
         Dataframe de pandas sobre el que se realiza el filtrado
 
     tipo: str
         String que indica el tipo de mensaje por el que queremos filtrar al dataframe
+
+    Returns
+    -------
+    pandas.Series
+        Serie de valores de pandas, contiene los datos filtrados.
     """
 
     # filtro por tipo indicado
@@ -158,7 +162,7 @@ def do_chart_plot(df: pandas.DataFrame, ports: List[str]) -> None:
     """
     Genera y muestra un gráfico de línea común basado en los datos del dataframe, filtrado por los puertos.
 
-    Parámetros
+    Parameters
     ----------
     df: pandas.DataFrame
         Dataframe con la información a graficar.
@@ -191,11 +195,11 @@ def do_chart_plot(df: pandas.DataFrame, ports: List[str]) -> None:
 
 
 # grafico tipo step
-def do_chart_step(df: pandas.DataFrame, ports: List[str]):
+def do_chart_step(df: pandas.DataFrame, ports: List[str]) -> None:
     """
     Genera y muestra un gráfico step basado en los datos del dataframe, filtrado por los puertos.
 
-    Parámetros
+    Parameters
     ----------
     df: pandas.DataFrame
         Dataframe con la información a graficar.
@@ -226,11 +230,11 @@ def do_chart_step(df: pandas.DataFrame, ports: List[str]):
     return
 
 
-def do_chart_stem(df: pandas.DataFrame, ports: List[str]):
+def do_chart_stem(df: pandas.DataFrame, ports: List[str]) -> None:
     """
     Genera y muestra un gráfico stem basado en los datos del dataframe, filtrado por los puertos.
 
-    Parámetros
+    Parameters
     ----------
     df: pandas.DataFrame
         Dataframe con la información a graficar.
@@ -254,13 +258,13 @@ def do_chart_stem(df: pandas.DataFrame, ports: List[str]):
     plt.legend()
 
 
-def do_chart(df: pandas.DataFrame, chart: str = "plot", ports: List[str] = list()) -> None:
+def do_chart(df: pandas.DataFrame, chart: str = "plot", ports: List[str] = []) -> None:
     """
     Método general para graficar.
     Asumo que es valor en función de tiempo.
     Doy opción a especificar de que puertos quiere graficarse (caso logs)
 
-    Parámetros
+    Parameters
     ----------
     df: pandas.DataFrame
         Dataframe que contiene los datos a utilizar para graficar.
