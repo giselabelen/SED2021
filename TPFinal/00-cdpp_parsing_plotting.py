@@ -19,9 +19,10 @@ def parse_value(value: str) -> Union[float, Tuple[float]]:
     """
     Parsea un string y devuelve un float o una lista de floats
     """
-    is_list = value.strip().startswith("[") and value.strip().endswith("]")
-    if is_list:
-        return tuple(float(num) for num in value.replace('[', '').replace(']', '').split(', '))
+    if type(value) == str:
+    	is_list = value.strip().startswith("[") and value.strip().endswith("]")
+    	if is_list:
+        	return tuple(float(num) for num in value.replace('[', '').replace(']', '').split(', '))
     return float(value)
 
 
@@ -144,8 +145,8 @@ def filter_and_name(df: pandas.DataFrame, tipo: str) -> pandas.Series:
     # if(TIME_COL2 in col_names):
     #   filtered_df[TIME_COL2] = filtered_df[TIME_COL2].apply(time_to_secs)
 
-#    if VALUE_COL in col_names:
- #       filtered_df[VALUE_COL] = filtered_df[VALUE_COL].apply(parse_value)
+    if VALUE_COL in col_names:
+        filtered_df[VALUE_COL] = filtered_df[VALUE_COL].apply(parse_value)
 
     # elimino columnas sin información
     to_drop = [0, 1, 7, 8]
@@ -188,7 +189,7 @@ def do_chart_plot(df: pandas.DataFrame, ports: List[str]) -> None:
             plt.legend()
     else:
         x_values = df[TIME_COL]
-        if type(df[VALUE_COL][0]) == tuple:
+        if type(df[VALUE_COL].values[0]) == tuple:
             y_values, *_ = df[VALUE_COL].str
         else:
             y_values = df[VALUE_COL].tolist()  # convierto de serie de pandas a lista
@@ -224,7 +225,7 @@ def do_chart_step(df: pandas.DataFrame, ports: List[str]) -> None:
             plt.legend()
     else:
         x_values = df[TIME_COL]
-        if type(df[VALUE_COL][0]) == tuple:
+        if type(df[VALUE_COL].values[0]) == tuple:
             y_values, *_ = df[VALUE_COL].str
         else:
             y_values = df[VALUE_COL].tolist()  # convierto de serie de pandas a lista
