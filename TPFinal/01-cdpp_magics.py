@@ -5,7 +5,6 @@ from urllib import request
 from typing import Dict, List, Optional, Callable
 import pandas
 import subprocess
-import shutil
 import zipfile
 import os
 
@@ -41,7 +40,7 @@ def download_file(url: str, download_file_path: Path):
     try:
         request.urlretrieve(url, download_file_path)
     except Exception as e:
-        print(f"Error: Failed to download file {e}")
+        print(f"Error: Falló la descarga del archivo {url}. {str(e)}")
 
 
 def parse_args_from_string(s: str) -> Dict[str, str]:
@@ -102,8 +101,22 @@ class CDPP(Magics):
         self.BASE_BIN: Path = Path()
         self.CDPP_ATOMICS: Path = Path()
         self.CDPP_EXAMPLES_CELL: Path = Path()
-        self.CDPP_BIN: Path = Path()
-        self.DRAWLOG_BIN: Path = Path()
+
+    def reset_paths(self):
+        self.SED_HOME: Path = Path()
+        self.CDPP_DIR: Path = Path()
+        self.CDPP_SRC: Path = Path()
+        self.CDPP_EXAMPLES: Path = Path()
+        self.CDPP_SCRIPTS: Path = Path()
+        self.BASE_BIN: Path = Path()
+        self.CDPP_ATOMICS: Path = Path()
+        self.CDPP_EXAMPLES_CELL: Path = Path()
+
+    def reset_project_paths(self):
+        self.CDPP_PROJECT_SRC: Optional[Path] = None
+        self.CDPP_PROJECT_BIN: Optional[Path] = None
+        self.CDPP_PROJECT_DIR: Optional[Path] = None
+        self.compile_from_project: bool = False
 
     def get_cdpp_cwd(self) -> Optional[Path]:
         """
@@ -131,24 +144,33 @@ class CDPP(Magics):
             self.compile_from_project = parameters[0].lower() == "-c"
             self.CDPP_PROJECT_DIR = self.CDPP_DIR.joinpath(Path(parameters[1]))
 
-        if not self.CDPP_PROJECT_DIR.exists():
-            raise NotADirectoryError(f"Error: Project dir {str(self.CDPP_PROJECT_DIR)} does not exists.")
+        if not self.CDPP_PROJECT_DIR.exists() or not self.CDPP_PROJECT_DIR.is_dir():
+            self.reset_project_paths()
+            raise NotADirectoryError(f"Error: No se encontró el directorio {str(self.CDPP_PROJECT_DIR)}.")
 
         if not path_is_parent(self.SED_HOME, self.CDPP_PROJECT_DIR):
-            raise NotADirectoryError("Error: Project directory must be relative to SED folder")
+            self.reset_project_paths()
+            raise NotADirectoryError("Error: El directorio del proyecto debe ser relativo al de la carpeta"
+                                     f"{self.SED_HOME}. Por lo general los proyectos se ubican en la carpeta"
+                                     f"{self.CDPP_EXAMPLES}."
+                                     )
 
         globals()["CDPP_PATHS"]["CDPP_PROJECT_DIR"] = self.CDPP_PROJECT_DIR
 
         if self.compile_from_project:
             self.CDPP_PROJECT_SRC = self.CDPP_PROJECT_DIR.joinpath("src")
 
-            if not self.CDPP_PROJECT_SRC.exists():
-                raise NotADirectoryError(f"Error: Project src dir {str(self.CDPP_PROJECT_SRC)} does not exists.")
+            if not self.CDPP_PROJECT_SRC.exists() or not self.CDPP_PROJECT_SRC.is_dir():
+                self.reset_project_paths()
+                raise NotADirectoryError(f"Error: {str(self.CDPP_PROJECT_DIR)} "
+                                         "no contiene un directorio llamado 'src'.")
 
             self.CDPP_PROJECT_BIN = self.CDPP_PROJECT_SRC.joinpath("bin")
 
-            if not self.CDPP_PROJECT_BIN.exists():
-                raise NotADirectoryError(f"Error: Project src/bin dir {str(self.CDPP_PROJECT_BIN)} does not exists.")
+            if not self.CDPP_PROJECT_BIN.exists() or not self.CDPP_PROJECT_BIN.is_dir():
+                self.reset_project_paths()
+                raise NotADirectoryError(f"Error: {str(self.CDPP_PROJECT_SRC)}"
+                                         " no contiene un directorio llamado 'bin'.")
         else:
             self.CDPP_PROJECT_SRC = None
             self.CDPP_PROJECT_BIN = None
@@ -169,34 +191,62 @@ class CDPP(Magics):
         args = parse_argstring(CDPP.cdpp_init, line)
 
         home_path: Path = Path(args.home)
-        if not home_path.exists():
-            raise NotADirectoryError(f"Error: Folder path {home_path} does not exists.")
+        if not home_path.exists() or not home_path.is_dir():
+            raise NotADirectoryError(f"Error: No se encontró el directorio {home_path}.")
+
         self.SED_HOME = home_path.joinpath('SED')
-        if not self.SED_HOME.exists():
-            raise NotADirectoryError(f"Error: {home_path} does not contain folder named SED.")
+        if not self.SED_HOME.exists() or not self.SED_HOME.is_dir():
+            self.reset_paths()
+            raise NotADirectoryError(f"Error: {str(home_path)} no contiene un directorio llamado 'SED'.")
 
         # Directorio base donde está instalado el simulador
 
         self.CDPP_DIR = self.SED_HOME.joinpath('CDPP_ExtendedStates-codename-Santi')
-        if not self.CDPP_DIR.exists():
-            raise NotADirectoryError(f"Error: {home_path} does not contain folder named"
-                                     "CDPP_ExtendedStates-codename-Santi.")
+        if not self.CDPP_DIR.exists() or not self.CDPP_DIR.is_dir():
+            self.reset_paths()
+            raise NotADirectoryError(f"Error: {str(self.SED_HOME)} no contiene un directorio llamado"
+                                     "'CDPP_ExtendedStates-codename-Santi.'")
 
         self.CDPP_SRC = self.CDPP_DIR.joinpath('src')
+        if not self.CDPP_SRC.exists() or not self.CDPP_SRC.is_dir():
+            self.reset_paths()
+            raise NotADirectoryError(f"Error: {self.CDPP_DIR} no contiene un directorio llamado"
+                                     "'src'.")
+
         self.CDPP_EXAMPLES = self.CDPP_DIR.joinpath('examples')
+        if not self.CDPP_EXAMPLES.exists() or not self.CDPP_EXAMPLES.is_dir():
+            self.reset_paths()
+            raise NotADirectoryError(f"Error: {self.CDPP_DIR} no contiene un directorio llamado"
+                                     "'examples'.")
+
         self.CDPP_SCRIPTS = self.CDPP_DIR.joinpath('scripts')
+        if not self.CDPP_SCRIPTS.exists() or not self.CDPP_SCRIPTS.is_dir():
+            self.reset_paths()
+            raise NotADirectoryError(f"Error: {self.CDPP_DIR} no contiene un directorio llamado"
+                                     "'scripts'.")
+
         self.BASE_BIN = self.CDPP_SRC.joinpath('bin')
+        if not self.BASE_BIN.exists() or not self.BASE_BIN.is_dir():
+            self.reset_paths()
+            raise NotADirectoryError(f"Error: {self.CDPP_SRC} no contiene un directorio llamado"
+                                     "'bin'.")
+
         self.CDPP_ATOMICS = self.CDPP_SRC.joinpath('cd++/atomics')
+        if not self.CDPP_ATOMICS.exists() or not self.CDPP_ATOMICS.is_dir():
+            self.reset_paths()
+            raise NotADirectoryError(f"Error: {self.CDPP_SRC} no contiene un directorio llamado"
+                                     "'atomics'.")
 
         self.CDPP_EXAMPLES_CELL = self.CDPP_EXAMPLES.joinpath('cell-devs')
-        self.CDPP_BIN = self.BASE_BIN.joinpath('cd++')
-        self.DRAWLOG_BIN = self.BASE_BIN.joinpath('drawlog')
+        if not self.CDPP_EXAMPLES_CELL.exists() or not self.CDPP_EXAMPLES_CELL.is_dir():
+            self.reset_paths()
+            raise NotADirectoryError(f"Error: {self.CDPP_EXAMPLES} no contiene un directorio llamado"
+                                     "'cell-devs'.")
 
         cdpp_paths: Dict[str, Path] = {"SED_HOME": self.SED_HOME, "CDPP_DIR": self.CDPP_DIR, "CDPP_SRC": self.CDPP_SRC,
                                        "CDPP_EXAMPLES": self.CDPP_EXAMPLES,
                                        "CDPP_EXAMPLES_CELL": self.CDPP_EXAMPLES_CELL, "CDPP_SCRIPTS": self.CDPP_SCRIPTS,
-                                       "CDPP_ATOMICS": self.CDPP_ATOMICS, "CDPP_BIN": self.CDPP_BIN,
-                                       "DRAWLOG_BIN": self.DRAWLOG_BIN, "BASE_BIN": self.BASE_BIN}
+                                       "CDPP_ATOMICS": self.CDPP_ATOMICS, "BASE_BIN": self.BASE_BIN}
 
         globals()["CDPP_PATHS"] = cdpp_paths
 
@@ -238,8 +288,8 @@ class CDPP(Magics):
 
         if not path_is_parent(self.CDPP_PROJECT_DIR, file_path) and (self.CDPP_PROJECT_DIR / file_path).exists():
             file_path = self.CDPP_PROJECT_DIR / file_path
-        if not file_path.exists():
-            print(f"Error: File {str(file_path)} does not exists.")
+        if not file_path.exists() or not file_path.is_file():
+            raise FileNotFoundError(f"Error: No se encontró el archivo {str(file_path)}.")
         print(file_path.read_text())
 
     @magic_arguments()
@@ -252,8 +302,7 @@ class CDPP(Magics):
         args = parse_argstring(CDPP.cdpp_copy_to_project, line)
         src_path: Path = Path(args.folder_path)
         if not src_path.exists():
-            print(f"Error: Path {str(src_path)} does not exists.")
-            return
+            raise FileNotFoundError(f"Error: No se encontro archivo o carpeta en el path {str(src_path)}.")
         src = src_path.absolute()
         dst = str(self.CDPP_PROJECT_DIR.absolute())
 
@@ -268,9 +317,9 @@ class CDPP(Magics):
         print(f"Copiando contenidos de {src} a {dst}...")
         try:
             subprocess.run(command, check=True)
-            print("Listo!")
         except subprocess.CalledProcessError as e:
-            print(f"Error: Directory copy failed. {str(e)}")
+            print(f"Error: Falló copia de archivos. {str(e)}")
+            raise e
 
     @magic_arguments()
     @argument("url", type=str, help="URL del recurso a descargar.")
@@ -285,7 +334,7 @@ class CDPP(Magics):
         out_path = Path(args.download_path)
         download_file(args.url, out_path)
 
-        print(f"Done: {args.url}, {out_path}")
+        print(f"Fin descarga: {args.url}, {out_path}")
 
     @magic_arguments()
     @argument("download_path", type=str,
@@ -302,7 +351,7 @@ class CDPP(Magics):
         out_path: Path = self.CDPP_PROJECT_DIR.joinpath(path)
         download_file(URL_CARLETON_MODELS + args.download_path, out_path)
 
-        print(f"Done: {URL_CARLETON_MODELS + args.download_path}, {str(out_path)}")
+        print(f"Fin descarga: {URL_CARLETON_MODELS + args.download_path}, {str(out_path)}")
 
     @magic_arguments()
     @argument("path", type=str,
@@ -316,12 +365,12 @@ class CDPP(Magics):
         file_path = self.CDPP_PROJECT_DIR.joinpath(args.path)
 
         if not file_path.exists():
-            print(f"Error: File {str(file_path)} does not exists")
+            raise FileNotFoundError(f"Error: No se encontró el archivo {str(file_path)}.")
 
         with zipfile.ZipFile(f"{str(file_path)}", 'r') as zip_ref:
             zip_ref.extractall(self.CDPP_PROJECT_DIR)
 
-        print(f"Done extracting {line}")
+        print(f"Fin extracción {line}.")
 
     @line_magic
     def cdpp_compile(self, _: str) -> None:
@@ -329,6 +378,16 @@ class CDPP(Magics):
         Función magic de línea que se encarga de compilar el simulador CDPP
         """
         command: List[str] = ["make", "-j4"]
+        print(subprocess.Popen(command, cwd=self.get_cdpp_cwd(), universal_newlines=True, shell=True,
+                               stdout=subprocess.PIPE).stdout.read())
+
+    @line_magic
+    def cdpp_clean(self, _: str) -> None:
+        """
+        Función magic de línea que se encarga de limpiar el entorno de compilación del simulador CDPP y de sus
+        herramientas.
+        """
+        command: List[str] = ["make", "clean"]
         print(subprocess.Popen(command, cwd=self.get_cdpp_cwd(), universal_newlines=True, shell=True,
                                stdout=subprocess.PIPE).stdout.read())
 
@@ -344,12 +403,20 @@ class CDPP(Magics):
     @line_magic
     def cdpp_recompile(self, line: str) -> None:
         """
-        Función magic de línea que se encarga de limpiar la compilación del simulador CDPP y luego lo compila.
+        Función magic de línea que se encarga de limpiar el entorno de compilación del simulador CDPP
+         y luego lo compila.
         """
-        command: List[str] = ["make", "clean"]
-        print(subprocess.Popen(command, cwd=self.get_cdpp_cwd(), universal_newlines=True, shell=True,
-                               stdout=subprocess.PIPE).stdout.read())
+        self.cdpp_clean(line)
         self.cdpp_compile(line)
+
+    @line_magic
+    def cdpp_recompile_tools(self, line: str) -> None:
+        """
+        Función magic de línea que se encarga de limpiar el entorno de compilación de las herramientas
+        del simulador CDPP y luego las compila.
+        """
+        self.cdpp_clean(line)
+        self.cdpp_compile_tools(line)
 
     @line_magic
     def cdpp_help(self, _: str) -> None:
@@ -357,8 +424,8 @@ class CDPP(Magics):
         Función magic de línea que muestra la ayuda del programa cd++
         """
         if self.SED_HOME == Path():
-            print("Error: Entorno CDPP no inicializado, use el magic %cdpp_init primero y vuelva a intentarlo.")
-            return
+            raise RuntimeError("Error: Entorno CDPP no inicializado,"
+                               "use el magic %cdpp_init primero y vuelva a intentarlo.")
         program: Path = self.get_cdpp_cwd().joinpath("bin").joinpath("cd++")
         command: List[str] = [f"{str(program)}", "-h"]
         print(subprocess.Popen(command, cwd=self.get_cdpp_cwd(), universal_newlines=True,
@@ -370,8 +437,8 @@ class CDPP(Magics):
         Función magic de línea que muestra la ayuda del programa drawlog
         """
         if self.SED_HOME == Path():
-            print("Error: Entorno CDPP no inicializado, use el magic %cdpp_init primero y vuelva a intentarlo.")
-            return
+            raise RuntimeError("Error: Entorno CDPP no inicializado,"
+                               "use el magic %cdpp_init primero y vuelva a intentarlo.")
         program: Path = self.BASE_BIN.joinpath("drawlog")
         command: List[str] = [f"{str(program)}", "-h"]
         print(subprocess.Popen(command, cwd=self.get_cdpp_cwd(), universal_newlines=True,
@@ -382,21 +449,16 @@ class CDPP(Magics):
         """
         Función magic de línea que ejecuta el programa drawlog con sus parámetros correspondientes indicados por línea
         """
-        parameters: Dict[str, str] = parse_args_from_string(line)
-        for k in parameters.keys():
-            if k in ["-l", "-m"]:
-                parameters[k] = str(self.CDPP_PROJECT_DIR / Path(parameters[k]))
+        args = line.split()
+        for i in range(0, len(args)):
+            if args[i] in ["-l", "-m"]:
+                args[i] = str(self.CDPP_PROJECT_DIR / Path(args[i]))
 
         if not self.compile_from_project:
-            program: Path = self.BASE_BIN.joinpath("cd++")
+            program: Path = self.BASE_BIN.joinpath("drawlog")
         else:
-            program: Path = self.CDPP_PROJECT_BIN.joinpath("cd++")
-        command: List[str] = [f"{str(program)}"]
-
-        for k, v in parameters.items():
-            command.append(k)
-            command.append(v)
-
+            program: Path = self.CDPP_PROJECT_BIN.joinpath("drawlog")
+        command: List[str] = [f"{str(program)}", *args]
         print(subprocess.Popen(command, cwd=self.CDPP_PROJECT_DIR, universal_newlines=True,
                                stdout=subprocess.PIPE).stdout.read())
 
@@ -420,7 +482,6 @@ class CDPP(Magics):
             command.append(k)
             command.append(v)
 
-        print("Ejecutando {}...".format(*command))
         print(subprocess.Popen(command, cwd=self.CDPP_PROJECT_DIR, universal_newlines=True,
                                stdout=subprocess.PIPE).stdout.read())
 
@@ -445,8 +506,7 @@ class CDPP(Magics):
         if self.CDPP_PROJECT_DIR is not None:
             path = self.CDPP_PROJECT_DIR / Path(args.path_to_out_ev)
         if not path.exists():
-            print(f"Error: File {line} does not exists.")
-            return
+            raise FileNotFoundError(f"Error: No se encontró el archivo {line}.")
         df = parser_out_ev(path)
         return df
 
@@ -464,8 +524,7 @@ class CDPP(Magics):
         if self.CDPP_PROJECT_DIR is not None:
             path = self.CDPP_PROJECT_DIR / Path(args.path_log_file)
         if not path.exists():
-            print(f"Error: File {line} does not exists.")
-            return
+            raise FileNotFoundError(f"Error: No se encontró el archivo {line}.")
         return parser_log(path)
 
 
