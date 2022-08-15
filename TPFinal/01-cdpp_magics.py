@@ -23,7 +23,6 @@ LINE_MAGICS: List[str] = ["lscdpp", "cdpp_run", "drawlog_run", "cdpp_help", "dra
                           "cdpp_compile_tools", "cdpp_recompile", "cdpp_unzip", "cdpp_download",
                           "cdpp_download_carleton", "cdpp_copy_to_project", "cdpp_show", "cdpp_set_project",
                           "cdpp_init", "parse_log", "parse_out_ev"]
-CELL_MAGICS: List[str] = []
 
 
 def download_file(url: str, download_file_path: Path):
@@ -145,15 +144,15 @@ class CDPP(Magics):
             self.CDPP_PROJECT_DIR = self.CDPP_DIR.joinpath(Path(parameters[1]))
 
         if not self.CDPP_PROJECT_DIR.exists() or not self.CDPP_PROJECT_DIR.is_dir():
+            message = f"Error: No se encontró el directorio {str(self.CDPP_PROJECT_DIR)}."
             self.reset_project_paths()
-            raise NotADirectoryError(f"Error: No se encontró el directorio {str(self.CDPP_PROJECT_DIR)}.")
+            raise NotADirectoryError(message)
 
         if not path_is_parent(self.SED_HOME, self.CDPP_PROJECT_DIR):
+            message = "Error: El directorio del proyecto debe ser relativo al de la carpeta"\
+                      f"{self.SED_HOME}. Por lo general los proyectos se ubican en la carpeta {self.CDPP_EXAMPLES}."
             self.reset_project_paths()
-            raise NotADirectoryError("Error: El directorio del proyecto debe ser relativo al de la carpeta"
-                                     f"{self.SED_HOME}. Por lo general los proyectos se ubican en la carpeta"
-                                     f"{self.CDPP_EXAMPLES}."
-                                     )
+            raise NotADirectoryError(message)
 
         globals()["CDPP_PATHS"]["CDPP_PROJECT_DIR"] = self.CDPP_PROJECT_DIR
 
@@ -161,16 +160,16 @@ class CDPP(Magics):
             self.CDPP_PROJECT_SRC = self.CDPP_PROJECT_DIR.joinpath("src")
 
             if not self.CDPP_PROJECT_SRC.exists() or not self.CDPP_PROJECT_SRC.is_dir():
+                message = f"Error: {str(self.CDPP_PROJECT_DIR)} no contiene un directorio llamado 'src'."
                 self.reset_project_paths()
-                raise NotADirectoryError(f"Error: {str(self.CDPP_PROJECT_DIR)} "
-                                         "no contiene un directorio llamado 'src'.")
+                raise NotADirectoryError(message)
 
             self.CDPP_PROJECT_BIN = self.CDPP_PROJECT_SRC.joinpath("bin")
 
             if not self.CDPP_PROJECT_BIN.exists() or not self.CDPP_PROJECT_BIN.is_dir():
+                message = f"Error: {str(self.CDPP_PROJECT_SRC)} no contiene un directorio llamado 'bin'."
                 self.reset_project_paths()
-                raise NotADirectoryError(f"Error: {str(self.CDPP_PROJECT_SRC)}"
-                                         " no contiene un directorio llamado 'bin'.")
+                raise NotADirectoryError(message)
         else:
             self.CDPP_PROJECT_SRC = None
             self.CDPP_PROJECT_BIN = None
@@ -203,45 +202,46 @@ class CDPP(Magics):
 
         self.CDPP_DIR = self.SED_HOME.joinpath('CDPP_ExtendedStates-codename-Santi')
         if not self.CDPP_DIR.exists() or not self.CDPP_DIR.is_dir():
+            message = f"Error: {str(self.SED_HOME)} no contiene un directorio llamado"\
+                      "'CDPP_ExtendedStates-codename-Santi.'"
             self.reset_paths()
-            raise NotADirectoryError(f"Error: {str(self.SED_HOME)} no contiene un directorio llamado"
-                                     "'CDPP_ExtendedStates-codename-Santi.'")
+            raise NotADirectoryError(message)
 
         self.CDPP_SRC = self.CDPP_DIR.joinpath('src')
         if not self.CDPP_SRC.exists() or not self.CDPP_SRC.is_dir():
+            message = f"Error: {self.CDPP_DIR} no contiene un directorio llamado 'src'."
             self.reset_paths()
-            raise NotADirectoryError(f"Error: {self.CDPP_DIR} no contiene un directorio llamado"
-                                     "'src'.")
+            raise NotADirectoryError(message)
 
         self.CDPP_EXAMPLES = self.CDPP_DIR.joinpath('examples')
         if not self.CDPP_EXAMPLES.exists() or not self.CDPP_EXAMPLES.is_dir():
+            message = f"Error: {self.CDPP_DIR} no contiene un directorio llamado 'examples'."
             self.reset_paths()
-            raise NotADirectoryError(f"Error: {self.CDPP_DIR} no contiene un directorio llamado"
-                                     "'examples'.")
+            raise NotADirectoryError(message)
 
         self.CDPP_SCRIPTS = self.CDPP_DIR.joinpath('scripts')
         if not self.CDPP_SCRIPTS.exists() or not self.CDPP_SCRIPTS.is_dir():
+            message = f"Error: {self.CDPP_DIR} no contiene un directorio llamado 'scripts'."
             self.reset_paths()
-            raise NotADirectoryError(f"Error: {self.CDPP_DIR} no contiene un directorio llamado"
-                                     "'scripts'.")
+            raise NotADirectoryError(message)
 
         self.BASE_BIN = self.CDPP_SRC.joinpath('bin')
         if not self.BASE_BIN.exists() or not self.BASE_BIN.is_dir():
+            message = f"Error: {self.CDPP_SRC} no contiene un directorio llamado 'bin'."
             self.reset_paths()
-            raise NotADirectoryError(f"Error: {self.CDPP_SRC} no contiene un directorio llamado"
-                                     "'bin'.")
+            raise NotADirectoryError(message)
 
         self.CDPP_ATOMICS = self.CDPP_SRC.joinpath('cd++/atomics')
         if not self.CDPP_ATOMICS.exists() or not self.CDPP_ATOMICS.is_dir():
+            message = f"Error: {self.CDPP_SRC} no contiene un directorio llamado 'atomics'."
             self.reset_paths()
-            raise NotADirectoryError(f"Error: {self.CDPP_SRC} no contiene un directorio llamado"
-                                     "'atomics'.")
+            raise NotADirectoryError(message)
 
         self.CDPP_EXAMPLES_CELL = self.CDPP_EXAMPLES.joinpath('cell-devs')
         if not self.CDPP_EXAMPLES_CELL.exists() or not self.CDPP_EXAMPLES_CELL.is_dir():
+            message = f"Error: {self.CDPP_EXAMPLES} no contiene un directorio llamado 'cell-devs'."
             self.reset_paths()
-            raise NotADirectoryError(f"Error: {self.CDPP_EXAMPLES} no contiene un directorio llamado"
-                                     "'cell-devs'.")
+            raise NotADirectoryError(message)
 
         cdpp_paths: Dict[str, Path] = {"SED_HOME": self.SED_HOME, "CDPP_DIR": self.CDPP_DIR, "CDPP_SRC": self.CDPP_SRC,
                                        "CDPP_EXAMPLES": self.CDPP_EXAMPLES,
@@ -378,7 +378,7 @@ class CDPP(Magics):
         Función magic de línea que se encarga de compilar el simulador CDPP
         """
         command: List[str] = ["make", "-j4"]
-        print(subprocess.Popen(command, cwd=self.get_cdpp_cwd(), universal_newlines=True, shell=True,
+        print(subprocess.Popen(command, cwd=self.get_cdpp_cwd(), universal_newlines=True,
                                stdout=subprocess.PIPE).stdout.read())
 
     @line_magic
@@ -388,7 +388,7 @@ class CDPP(Magics):
         herramientas.
         """
         command: List[str] = ["make", "clean"]
-        print(subprocess.Popen(command, cwd=self.get_cdpp_cwd(), universal_newlines=True, shell=True,
+        print(subprocess.Popen(command, cwd=self.get_cdpp_cwd(), universal_newlines=True,
                                stdout=subprocess.PIPE).stdout.read())
 
     @line_magic
@@ -397,7 +397,7 @@ class CDPP(Magics):
         Función magic de línea que se encarga de compilar las herramientas auxiliares del simulador CDPP(ej: drawlog)
         """
         command: List[str] = ["make", "-j4", "tools"]
-        print(subprocess.Popen(command, cwd=self.get_cdpp_cwd(), universal_newlines=True, shell=True,
+        print(subprocess.Popen(command, cwd=self.get_cdpp_cwd(), universal_newlines=True,
                                stdout=subprocess.PIPE).stdout.read())
 
     @line_magic
@@ -486,11 +486,11 @@ class CDPP(Magics):
                                stdout=subprocess.PIPE).stdout.read())
 
     @line_magic
-    def lscdpp(self, _: str) -> Dict[str, List[str]]:
+    def lscdpp(self, _: str) -> List[str]:
         """
         Función magic que lista todos los magics definidos que simplifican el uso del simulador CDPP
         """
-        return {"line": LINE_MAGICS, "cell": CELL_MAGICS}
+        return LINE_MAGICS
 
     @magic_arguments()
     @argument("path_to_out_ev", type=str,
