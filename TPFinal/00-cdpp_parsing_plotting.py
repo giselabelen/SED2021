@@ -144,16 +144,22 @@ def filter_and_name(df: pandas.DataFrame, tipo: str) -> pandas.Series:
     # if(TIME_COL2 in col_names):
     #   filtered_df[TIME_COL2] = filtered_df[TIME_COL2].apply(time_to_secs)
 
-    if VALUE_COL in col_names:
-        filtered_df[VALUE_COL] = filtered_df[VALUE_COL].apply(parse_value)
+#    if VALUE_COL in col_names:
+ #       filtered_df[VALUE_COL] = filtered_df[VALUE_COL].apply(parse_value)
 
     # elimino columnas sin información
     to_drop = [0, 1, 7, 8]
+    l = []
+    
     for i in to_drop:
         if i not in col_names:
-            to_drop.remove(i)
+            l.append(i)
+            
+    for i in l:
+    	to_drop.remove(i)
 
     return filtered_df.drop(to_drop, axis=1)
+
 
 
 # MÉTODOS PARA GRAFICAR
